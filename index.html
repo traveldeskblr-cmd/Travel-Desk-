@@ -10,12 +10,10 @@
 <!-- Firebase RTDB -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <style>*{box-sizing:border-box;margin:0;padding:0;}body{overflow:hidden;}</style>
 </head>
 <body>
 <div id="root"></div>
-<div id="recaptcha-container"></div>
 <script>
 // ─── Firebase Configuration ───────────────────────────────────────────────────
 // 🔧 REPLACE these values with your Firebase project config
@@ -239,13 +237,12 @@ const Sel = ({ options, ...p }) => (
 
 // ─── OTP Helpers ──────────────────────────────────────────────────────────────
 const INACTIVITY_MS = 15 * 60 * 1000; // 15 minutes auto-logout
-const COUNTRY_CODE = "+91"; // 🔧 Change if drivers' mobiles are registered in a different country
 
-// Turns a stored 10-digit mobile number into E.164 format required by Firebase Phone Auth
-const toE164 = (mobile) => {
-  const digits = (mobile || "").replace(/\D/g, "").slice(-10);
-  return `${COUNTRY_CODE}${digits}`;
-};
+// 🔧 DEMO MODE: Driver login uses a fake/simulated OTP instead of a real SMS
+// provider. No message is actually sent — the code is generated locally and
+// shown on screen so the flow can be tested end-to-end. Swap sendOTP/
+// handleVerifyOTP below for a real SMS API when one is available.
+const generateFakeOTP = () => String(Math.floor(100000 + Math.random() * 900000));
 
 // ─── Login Screen ──────────────────────────────────────────────────────────────
 function Login({ onLogin, drivers, setDrivers }) {
@@ -261,7 +258,7 @@ function Login({ onLogin, drivers, setDrivers }) {
   const [info, setInfo] = useState("");
   const [sending, setSending] = useState(false);
   const [verifying, setVerifying] = useState(false);
-  const confirmationRef = useRef(null); // Firebase ConfirmationResult
+  const otpCodeRef = useRef(null); // the fake OTP code currently "sent"
 
   // Countdown timer for resend
   useEffect(() => {
@@ -269,14 +266,6 @@ function Login({ onLogin, drivers, setDrivers }) {
     const t = setTimeout(() => setResendCooldown(c => c - 1), 1000);
     return () => clearTimeout(t);
   }, [resendCooldown]);
-
-  // Clean up the reCAPTCHA verifier when the login screen unmounts
-  useEffect(() => () => {
-    if (window.recaptchaVerifier) {
-      try { window.recaptchaVerifier.clear(); } catch (e) {}
-      window.recaptchaVerifier = null;
-    }
-  }, []);
 
   const maskMobile = (m) => m ? m.slice(0,2) + "XXXXXX" + m.slice(-2) : "XXXXXXXX";
 
@@ -291,50 +280,33 @@ function Login({ onLogin, drivers, setDrivers }) {
 
   const sendOTP = (d) => {
     setErr("");
-    if (!FB_READY) {
-      setErr("SMS delivery isn't configured yet. Ask your administrator to set up Firebase.");
-      return;
-    }
+    setInfo("");
     setSending(true);
-    try {
-      // (Re)create the invisible reCAPTCHA verifier required by Firebase Phone Auth
-      if (!window.recaptchaVerifier) {
-        window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', { size: 'invisible' }, firebase.app());
-      }
-      firebase.auth().signInWithPhoneNumber(toE164(d.mobile), window.recaptchaVerifier)
-        .then((confirmationResult) => {
-          confirmationRef.current = confirmationResult;
-          setOtpStore({ maskedMobile: maskMobile(d.mobile), driverId: d.id });
-          setOtpInput("");
-          setStep("otp");
-          setResendCooldown(30);
-          setSending(false);
-        })
-        .catch((error) => {
-          console.error(error);
-          setErr(error.code === "auth/invalid-phone-number"
-            ? "The registered mobile number is invalid. Please contact Admin."
-            : "Couldn't send OTP right now. Please try again in a moment.");
-          setSending(false);
-          if (window.recaptchaVerifier) { try { window.recaptchaVerifier.clear(); } catch (e) {} window.recaptchaVerifier = null; }
-        });
-    } catch (e) {
-      console.error(e);
-      setErr("Couldn't send OTP right now. Please try again in a moment.");
+    // 🔧 DEMO MODE: no real SMS is sent. A fake code is generated locally and
+    // shown on screen so the login flow can be tested without an SMS provider.
+    setTimeout(() => {
+      const code = generateFakeOTP();
+      otpCodeRef.current = code;
+      setOtpStore({ maskedMobile: maskMobile(d.mobile), driverId: d.id });
+      setOtpInput("");
+      setStep("otp");
+      setResendCooldown(30);
       setSending(false);
-    }
+      setInfo(`Demo mode — your OTP is ${code}`);
+    }, 400);
   };
 
   const handleVerifyOTP = () => {
     setErr("");
-    if (!confirmationRef.current || !otpStore) {
+    if (!otpCodeRef.current || !otpStore) {
       setErr("Your session expired. Please request a new OTP.");
       setStep("empid");
       return;
     }
     setVerifying(true);
-    confirmationRef.current.confirm(otpInput.trim())
-      .then(() => {
+    // 🔧 DEMO MODE: compares against the fake code generated in sendOTP above.
+    setTimeout(() => {
+      if (otpInput.trim() === otpCodeRef.current) {
         const d = drivers.find(x => x.id === otpStore.driverId);
         const loginEntry = { ts: new Date().toLocaleString(), empId: d.empId };
         setDrivers(prev => prev.map(x => x.id === d.id
@@ -343,14 +315,11 @@ function Login({ onLogin, drivers, setDrivers }) {
         ));
         setVerifying(false);
         onLogin({ role:"driver", name:d.name, driverId:d.id, empId:d.empId, loginTime: Date.now() });
-      })
-      .catch((error) => {
-        console.error(error);
+      } else {
         setVerifying(false);
-        setErr(error.code === "auth/code-expired"
-          ? "OTP has expired. Please request a new one."
-          : "Invalid OTP. Please try again.");
-      });
+        setErr("Invalid OTP. Please try again.");
+      }
+    }, 300);
   };
 
   const handleResend = () => {
@@ -359,7 +328,7 @@ function Login({ onLogin, drivers, setDrivers }) {
     if (d) sendOTP(d);
   };
 
-  const resetDriverFlow = () => { setStep("empid"); setEmpId(""); setOtpInput(""); setOtpStore(null); setErr(""); setInfo(""); confirmationRef.current = null; };
+  const resetDriverFlow = () => { setStep("empid"); setEmpId(""); setOtpInput(""); setOtpStore(null); setErr(""); setInfo(""); otpCodeRef.current = null; };
 
   const adminSubmit = () => {
     setErr("");
@@ -411,7 +380,8 @@ function Login({ onLogin, drivers, setDrivers }) {
           <>
             <div style={{ background:"#EFF6FF", border:"1px solid #BFDBFE", borderRadius:8, padding:"10px 14px", marginBottom:16 }}>
               <div style={{ fontSize:13, color:"#1D4ED8", fontWeight:600 }}>OTP Sent</div>
-              <div style={{ fontSize:12, color:"#374151", marginTop:2 }}>A 6-digit OTP has been sent via SMS to {otpStore?.maskedMobile}.</div>
+              <div style={{ fontSize:12, color:"#374151", marginTop:2 }}>A 6-digit OTP has been "sent" to {otpStore?.maskedMobile}.</div>
+              {info && <div style={{ fontSize:12, color:"#1D4ED8", marginTop:6, fontWeight:700 }}>{info}</div>}
             </div>
             <FormField label="Enter OTP">
               <Inp
