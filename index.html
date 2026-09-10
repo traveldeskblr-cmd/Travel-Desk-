@@ -1,0 +1,2559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Travel Desk Management</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<!-- Firebase RTDB -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>*{box-sizing:border-box;margin:0;padding:0;}body{overflow:hidden;}</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+// ─── Firebase Configuration ───────────────────────────────────────────────────
+// 🔧 REPLACE these values with your Firebase project config
+const FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyBNI8C-RepUKqQ_1mI1ICzv-hI-RI9kI",
+  authDomain:        "gitam-travel-desk.firebaseapp.com",
+  databaseURL:       "https://gitam-travel-desk-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:         "gitam-travel-desk",
+  storageBucket:     "gitam-travel-desk.firebasestorage.app",
+  messagingSenderId: "165004285254",
+  appId:             "1:165004285254:web:d762b4e7fd09e930c2c147",
+  measurementId:     "G-QBW5NDD1PQ"
+};
+
+const FB_READY = FIREBASE_CONFIG.apiKey !== "YOUR_API_KEY";
+
+if (FB_READY) {
+  firebase.initializeApp(FIREBASE_CONFIG);
+}
+</script>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useMemo } = React;
+
+// ─── Seed Data ────────────────────────────────────────────────────────────────
+const SEED_VEHICLES = [
+  { id: "V001", number: "KA01AB1234", type: "SUV", make: "Toyota", model: "Fortuner", capacity: 7, fuel: "Diesel", owner: "GITAM University", driverId: "D001", status: "Available", purchaseDate: "2021-06-15", insuranceExpiry: "2025-06-14", pucExpiry: "2025-03-10", fitnessExpiry: "2026-06-14", roadTaxExpiry: "2026-06-14", permitExpiry: "2026-06-14", notes: "" },
+  { id: "V002", number: "KA01CD5678", type: "Sedan", make: "Honda", model: "City", capacity: 5, fuel: "Petrol", owner: "GITAM University", driverId: "D002", status: "On Trip", purchaseDate: "2022-01-10", insuranceExpiry: "2024-12-31", pucExpiry: "2025-02-28", fitnessExpiry: "2025-01-10", roadTaxExpiry: "2027-01-10", permitExpiry: "2025-06-01", notes: "" },
+  { id: "V003", number: "KA02EF9012", type: "Bus", make: "Tata", model: "Starbus", capacity: 32, fuel: "Diesel", owner: "GITAM University", driverId: "D003", status: "Under Maintenance", purchaseDate: "2020-03-20", insuranceExpiry: "2025-10-19", pucExpiry: "2025-08-01", fitnessExpiry: "2025-03-20", roadTaxExpiry: "2025-03-20", permitExpiry: "2025-09-19", notes: "Engine overhaul" },
+  { id: "V004", number: "KA03GH3456", type: "Van", make: "Force", model: "Traveller", capacity: 12, fuel: "Diesel", owner: "GITAM University", driverId: "", status: "Available", purchaseDate: "2023-07-05", insuranceExpiry: "2026-07-04", pucExpiry: "2025-07-04", fitnessExpiry: "2026-07-04", roadTaxExpiry: "2028-07-04", permitExpiry: "2027-07-04", notes: "" },
+];
+
+const SEED_DRIVERS = [
+  { id: "D001", empId: "EMP101", name: "Rajesh Kumar", mobile: "9876543210", licenseNo: "KA0120180012345", licenseExpiry: "2026-08-20", vehicleId: "V001", status: "Available", address: "Bangalore", pin: "1234", active: true, loginLog: [] },
+  { id: "D002", empId: "EMP102", name: "Suresh Naidu", mobile: "9876501234", licenseNo: "KA0120190054321", licenseExpiry: "2025-05-15", vehicleId: "V002", status: "On Trip", address: "Doddaballapura", pin: "1234", active: true, loginLog: [] },
+  { id: "D003", empId: "EMP103", name: "Vijay Sharma", mobile: "9845678901", licenseNo: "KA0120170067890", licenseExpiry: "2024-11-30", vehicleId: "V003", status: "Off Duty", address: "Devanahalli", pin: "1234", active: false, loginLog: [] },
+  { id: "D004", empId: "EMP104", name: "Arun Patil", mobile: "9900112233", licenseNo: "KA0120210098765", licenseExpiry: "2027-03-10", vehicleId: "", status: "Available", address: "Yelahanka", pin: "1234", active: true, loginLog: [] },
+];
+
+const SEED_TRIPS = [
+  { id: "T001", sheetNo: "629", vehicleType: "SUV", vehicleId: "V001", driverId: "D001", passengerName: "Ramesh, TiA", pickup: "GITAM Main Gate", destination: "Kempegowda Airport", purpose: "Official Travel", date: "2025-09-15", startTime: "09:00", startKms: 75763, closeTime: "17:15", closeKms: 75880, totalKms: 117, totalTime: "7.15 Hours", remarks: "", status: "Approved", requestedBy: "Admin", createdAt: "2025-09-10" },
+  { id: "T002", sheetNo: "630", vehicleType: "Sedan", vehicleId: "V002", driverId: "D002", passengerName: "Director, Finance", pickup: "Guest House", destination: "Vidhana Soudha", purpose: "Government Meeting", date: "2025-09-03", startTime: "14:00", startKms: 32100, closeTime: "18:30", closeKms: 32165, totalKms: 65, totalTime: "4.5 Hours", remarks: "", status: "Trip Started", requestedBy: "Admin", createdAt: "2025-09-02" },
+  { id: "T003", sheetNo: "631", vehicleType: "Bus", vehicleId: "V003", driverId: "D003", passengerName: "Students Group", pickup: "GITAM Campus", destination: "Mysuru", purpose: "Field Visit", date: "2025-09-20", startTime: "08:00", startKms: 12500, closeTime: "20:00", closeKms: 12800, totalKms: 300, totalTime: "12 Hours", remarks: "Return same day", status: "Requested", requestedBy: "Admin", createdAt: "2025-09-12" },
+  { id: "T004", sheetNo: "628", vehicleType: "SUV", vehicleId: "V001", driverId: "D001", passengerName: "HOD, Engineering", pickup: "GITAM Campus", destination: "Electronic City", purpose: "Industry Visit", date: "2025-08-28", startTime: "10:00", startKms: 75600, closeTime: "17:00", closeKms: 75763, totalKms: 163, totalTime: "7 Hours", remarks: "", status: "Trip Completed", requestedBy: "Admin", createdAt: "2025-08-25" },
+];
+
+const SEED_DOCS = [
+  { id: "DOC001", vehicleId: "V001", name: "RC Book", type: "Registration Certificate", uploadDate: "2021-06-16", expiryDate: "", status: "Valid", fileName: "V001_RC.pdf" },
+  { id: "DOC002", vehicleId: "V001", name: "Insurance Policy", type: "Insurance", uploadDate: "2024-06-15", expiryDate: "2025-06-14", status: "Valid", fileName: "V001_Insurance.pdf" },
+  { id: "DOC003", vehicleId: "V002", name: "PUC Certificate", type: "PUC", uploadDate: "2024-08-28", expiryDate: "2025-02-28", status: "Expiring Soon", fileName: "V002_PUC.pdf" },
+  { id: "DOC004", vehicleId: "V003", name: "Fitness Certificate", type: "Fitness", uploadDate: "2023-03-20", expiryDate: "2025-03-20", status: "Expiring Soon", fileName: "V003_Fitness.pdf" },
+];
+
+const TRIP_STATUSES = ["Requested","Approved","Vehicle Assigned","Driver Assigned","Trip Started","Trip Completed","Cancelled"];
+const VEHICLE_STATUSES = ["Available","On Trip","Under Maintenance","Inactive"];
+const DRIVER_STATUSES = ["Available","On Trip","Off Duty","On Leave"];
+const VEHICLE_TYPES = ["Sedan","SUV","Van","Bus","Pickup","Truck","Two-Wheeler"];
+const FUEL_TYPES = ["Petrol","Diesel","CNG","Electric","Hybrid"];
+const DOC_TYPES = ["Registration Certificate","Insurance","PUC","Fitness","Road Tax","Vehicle Permit","Driver License","Other"];
+
+// ─── Utilities ────────────────────────────────────────────────────────────────
+const today = () => new Date().toISOString().split("T")[0];
+const daysUntil = (d) => { if (!d) return 9999; const diff = new Date(d) - new Date(); return Math.ceil(diff / 86400000); };
+const fmtDate = (d) => { if (!d) return "—"; const [y,m,day] = d.split("-"); return `${day}/${m}/${y}`; };
+const uid = () => Math.random().toString(36).slice(2,8).toUpperCase();
+const statusColor = (s) => ({ "Available":"#10B981","On Trip":"#2E7CF6","Under Maintenance":"#F59E0B","Inactive":"#6B7280","Off Duty":"#6B7280","On Leave":"#8B5CF6","Approved":"#10B981","Requested":"#F59E0B","Trip Started":"#2E7CF6","Trip Completed":"#6B7280","Cancelled":"#EF4444","Vehicle Assigned":"#8B5CF6","Driver Assigned":"#EC4899","Valid":"#10B981","Expiring Soon":"#F59E0B","Expired":"#EF4444" }[s] || "#6B7280");
+const expiryStatus = (d) => { const days = daysUntil(d); if (days < 0) return "Expired"; if (days <= 30) return "Expiring Soon"; return "Valid"; };
+// ─── Firebase RTDB hook (falls back to localStorage when FB not configured) ───
+const useRTDB = (key, init) => {
+  const [v, sv] = useState(() => {
+    try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : init; } catch { return init; }
+  });
+  const skipWrite = useRef(false); // prevent echo-write on remote update
+
+  useEffect(() => {
+    if (!FB_READY) return;
+    const db = firebase.database();
+    const ref = db.ref("travel_desk/" + key);
+
+    // Listen for remote changes
+    const unsub = ref.on("value", (snap) => {
+      const data = snap.val();
+      if (data !== null) {
+        skipWrite.current = true;
+        sv(data);
+      } else {
+        // First run: seed Firebase with initial data
+        ref.set(init);
+      }
+    });
+
+    return () => ref.off("value", unsub);
+  }, [key]);
+
+  // Write to Firebase (and localStorage as backup) when state changes
+  useEffect(() => {
+    localStorage.setItem(key, JSON.stringify(v));
+    if (!FB_READY) return;
+    if (skipWrite.current) { skipWrite.current = false; return; }
+    firebase.database().ref("travel_desk/" + key).set(v);
+  }, [key, v]);
+
+  return [v, sv];
+};
+
+// ─── Icons (inline SVG) ────────────────────────────────────────────────────────
+const Icon = ({ n, size=18, color="currentColor" }) => {
+  const paths = {
+    dashboard: "M3 3h8v8H3zm10 0h8v8h-8zM3 13h8v8H3zm10 5h2v-2h-2zm4-4h-4v2h2v2h2zm-2 4h2v2h-2z",
+    vehicle: "M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8a1 1 0 001 1h1a1 1 0 001-1v-1h12v1a1 1 0 001 1h1a1 1 0 001-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z",
+    driver: "M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z",
+    trip: "M21 3L3 10.53v.98l6.84 2.65L12.48 21h.98L21 3z",
+    doc: "M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM6 4h6v6h6v10H6V4z",
+    report: "M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z",
+    bell: "M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z",
+    plus: "M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z",
+    edit: "M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z",
+    trash: "M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z",
+    eye: "M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z",
+    close: "M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z",
+    logout: "M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z",
+    check: "M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z",
+    warn: "M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z",
+    search: "M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z",
+    download: "M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z",
+    settings: "M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z",
+  };
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill={color}><path d={paths[n] || ""}/></svg>;
+};
+
+// ─── Styles (CSS-in-JS object) ────────────────────────────────────────────────
+const C = {
+  // Layout
+  app: { display:"flex", height:"100vh", fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif", background:"#F0F4F9", color:"#1A2C42", overflow:"hidden" },
+  sidebar: { width:240, background:"#0F1C2E", display:"flex", flexDirection:"column", flexShrink:0, overflow:"hidden" },
+  sidebarTop: { padding:"20px 16px 12px", borderBottom:"1px solid #1F3048" },
+  logo: { color:"#fff", fontSize:16, fontWeight:700, letterSpacing:"-0.3px", margin:0 },
+  logoSub: { color:"#64748B", fontSize:11, marginTop:2 },
+  nav: { flex:1, padding:"8px 0", overflowY:"auto" },
+  navItem: (active) => ({ display:"flex", alignItems:"center", gap:10, padding:"10px 16px", cursor:"pointer", color: active ? "#fff" : "#94A3B8", background: active ? "#1A3456" : "transparent", borderLeft: active ? "3px solid #2E7CF6" : "3px solid transparent", fontSize:13, fontWeight: active ? 600 : 400, transition:"all .15s" }),
+  navSection: { color:"#475569", fontSize:10, fontWeight:700, padding:"12px 16px 4px", textTransform:"uppercase", letterSpacing:"0.8px" },
+  main: { flex:1, display:"flex", flexDirection:"column", overflow:"hidden" },
+  topbar: { background:"#fff", borderBottom:"1px solid #E2E8F0", padding:"0 24px", height:56, display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0 },
+  pageTitle: { fontSize:18, fontWeight:700, color:"#0F1C2E", margin:0 },
+  content: { flex:1, overflowY:"auto", padding:24 },
+  // Cards
+  statsGrid: { display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))", gap:16, marginBottom:24 },
+  statCard: (accent) => ({ background:"#fff", borderRadius:10, padding:"18px 20px", borderTop:`3px solid ${accent}`, boxShadow:"0 1px 4px rgba(0,0,0,.06)" }),
+  statNum: { fontSize:28, fontWeight:700, color:"#0F1C2E", lineHeight:1 },
+  statLabel: { fontSize:12, color:"#64748B", marginTop:4 },
+  // Table
+  tableWrap: { background:"#fff", borderRadius:10, boxShadow:"0 1px 4px rgba(0,0,0,.06)", overflow:"hidden" },
+  tableHeader: { display:"flex", alignItems:"center", justifyContent:"space-between", padding:"16px 20px", borderBottom:"1px solid #E2E8F0" },
+  tableTitle: { fontSize:15, fontWeight:700, color:"#0F1C2E" },
+  table: { width:"100%", borderCollapse:"collapse" },
+  th: { background:"#F8FAFC", padding:"10px 14px", textAlign:"left", fontSize:11, fontWeight:700, color:"#64748B", textTransform:"uppercase", letterSpacing:"0.5px", borderBottom:"1px solid #E2E8F0" },
+  td: { padding:"12px 14px", fontSize:13, color:"#374151", borderBottom:"1px solid #F1F5F9", verticalAlign:"middle" },
+  // Badge
+  badge: (color) => ({ display:"inline-flex", alignItems:"center", padding:"3px 8px", borderRadius:99, fontSize:11, fontWeight:600, background:`${color}18`, color }),
+  // Buttons
+  btn: (variant="primary") => { const map = { primary:{ background:"#2E7CF6",color:"#fff" }, danger:{ background:"#EF4444",color:"#fff" }, ghost:{ background:"transparent",color:"#2E7CF6",border:"1px solid #2E7CF6" }, warn:{ background:"#F59E0B",color:"#fff" }, success:{ background:"#10B981",color:"#fff" } }; return { ...map[variant], padding:"7px 16px", borderRadius:7, border:"none", fontSize:13, fontWeight:600, cursor:"pointer", display:"inline-flex", alignItems:"center", gap:6 }; },
+  iconBtn: { background:"none", border:"none", cursor:"pointer", padding:"4px 6px", borderRadius:5, display:"inline-flex", alignItems:"center" },
+  // Forms
+  modal: { position:"fixed", inset:0, background:"rgba(0,0,0,.45)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000, padding:16 },
+  modalBox: { background:"#fff", borderRadius:12, width:"100%", maxWidth:600, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 20px 60px rgba(0,0,0,.25)" },
+  modalHead: { display:"flex", alignItems:"center", justifyContent:"space-between", padding:"20px 24px 16px", borderBottom:"1px solid #E2E8F0" },
+  modalTitle: { fontSize:17, fontWeight:700, color:"#0F1C2E" },
+  form: { padding:24 },
+  formGrid: { display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 },
+  formGroup: { display:"flex", flexDirection:"column", gap:5 },
+  label: { fontSize:12, fontWeight:600, color:"#374151" },
+  input: { padding:"9px 12px", border:"1px solid #D1D5DB", borderRadius:7, fontSize:13, color:"#1A2C42", outline:"none" },
+  select: { padding:"9px 12px", border:"1px solid #D1D5DB", borderRadius:7, fontSize:13, color:"#1A2C42", background:"#fff", outline:"none", width:"100%" },
+  // Alert
+  alertBar: (t) => { const c = { warn:"#F59E0B", danger:"#EF4444", info:"#2E7CF6" }[t]; return { background:`${c}12`, border:`1px solid ${c}30`, borderRadius:8, padding:"10px 14px", display:"flex", alignItems:"flex-start", gap:10, marginBottom:12 }; },
+  alertText: { fontSize:12, color:"#374151", lineHeight:1.5 },
+  // Misc
+  row: { display:"flex", alignItems:"center", gap:8 },
+  chip: (c) => ({ background:`${c}15`, color:c, padding:"2px 8px", borderRadius:4, fontSize:11, fontWeight:600 }),
+  emptyState: { textAlign:"center", padding:"48px 0", color:"#94A3B8" },
+  loginWrap: { minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:"linear-gradient(135deg,#0F1C2E 0%,#1A3456 100%)" },
+  loginCard: { background:"#fff", borderRadius:16, padding:"40px 36px", width:"100%", maxWidth:380, boxShadow:"0 24px 64px rgba(0,0,0,.35)" },
+  filterRow: { display:"flex", gap:10, flexWrap:"wrap", padding:"12px 20px", borderBottom:"1px solid #E2E8F0", alignItems:"center" },
+  searchInput: { padding:"8px 12px 8px 34px", border:"1px solid #D1D5DB", borderRadius:7, fontSize:13, outline:"none", minWidth:200 },
+  sectionGrid: { display:"grid", gridTemplateColumns:"1fr 1fr", gap:16, marginBottom:16 },
+};
+
+// ─── Reusable Components ───────────────────────────────────────────────────────
+const Badge = ({ status }) => <span style={C.badge(statusColor(status))}>{status}</span>;
+
+const Stat = ({ label, value, accent, sub }) => (
+  <div style={C.statCard(accent)}>
+    <div style={C.statNum}>{value}</div>
+    <div style={C.statLabel}>{label}</div>
+    {sub && <div style={{ fontSize:11, color:accent, marginTop:4, fontWeight:600 }}>{sub}</div>}
+  </div>
+);
+
+const Modal = ({ title, onClose, children, wide }) => (
+  <div style={C.modal} onClick={e => e.target === e.currentTarget && onClose()}>
+    <div style={{ ...C.modalBox, maxWidth: wide ? 800 : 600 }}>
+      <div style={C.modalHead}>
+        <span style={C.modalTitle}>{title}</span>
+        <button style={C.iconBtn} onClick={onClose}><Icon n="close" size={20} color="#64748B"/></button>
+      </div>
+      {children}
+    </div>
+  </div>
+);
+
+const Alert = ({ type="warn", children }) => (
+  <div style={C.alertBar(type)}>
+    <Icon n={type==="danger"?"close":type==="info"?"bell":"warn"} size={16} color={type==="danger"?"#EF4444":type==="info"?"#2E7CF6":"#F59E0B"}/>
+    <div style={C.alertText}>{children}</div>
+  </div>
+);
+
+const SearchBox = ({ value, onChange, placeholder }) => (
+  <div style={{ position:"relative" }}>
+    <div style={{ position:"absolute", left:10, top:"50%", transform:"translateY(-50%)" }}><Icon n="search" size={15} color="#94A3B8"/></div>
+    <input style={C.searchInput} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder || "Search…"}/>
+  </div>
+);
+
+const FormField = ({ label, children }) => (
+  <div style={C.formGroup}><label style={C.label}>{label}</label>{children}</div>
+);
+
+const Inp = ({ ...p }) => <input style={C.input} {...p}/>;
+const Sel = ({ options, ...p }) => (
+  <select style={C.select} {...p}>{options.map(o => <option key={o.value ?? o} value={o.value ?? o}>{o.label ?? o}</option>)}</select>
+);
+
+// ─── OTP Helpers ──────────────────────────────────────────────────────────────
+const OTP_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
+const INACTIVITY_MS = 15 * 60 * 1000; // 15 minutes auto-logout
+const generateOTP = () => String(Math.floor(100000 + Math.random() * 900000));
+
+// ─── Login Screen ──────────────────────────────────────────────────────────────
+function Login({ onLogin, drivers, setDrivers }) {
+  const [mode, setMode] = useState("admin");
+  const [pass, setPass] = useState("");
+  // Driver OTP flow states
+  const [step, setStep] = useState("empid"); // "empid" | "otp"
+  const [empId, setEmpId] = useState("");
+  const [otp, setOtp] = useState("");
+  const [otpStore, setOtpStore] = useState(null); // { code, expires, maskedMobile, driverId }
+  const [otpInput, setOtpInput] = useState("");
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [err, setErr] = useState("");
+  const [info, setInfo] = useState("");
+
+  // Countdown timer for resend
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const t = setTimeout(() => setResendCooldown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendCooldown]);
+
+  const maskMobile = (m) => m ? m.slice(0,2) + "XXXXXX" + m.slice(-2) : "XXXXXXXX";
+
+  const handleVerifyEmpId = () => {
+    setErr("");
+    const d = drivers.find(x => x.empId === empId.trim());
+    if (!d) { setErr("Employee ID not registered in the system."); return; }
+    if (!d.active) { setErr("Your access has been deactivated. Please contact Admin."); return; }
+    sendOTP(d);
+  };
+
+  const sendOTP = (d) => {
+    const code = generateOTP();
+    const expires = Date.now() + OTP_EXPIRY_MS;
+    setOtpStore({ code, expires, maskedMobile: maskMobile(d.mobile), driverId: d.id });
+    setOtpInput("");
+    setErr("");
+    setStep("otp");
+    setResendCooldown(30);
+    // In production this would call an SMS API. For demo, show OTP in info.
+    setInfo(`[Demo] OTP sent to ${maskMobile(d.mobile)}: ${code}`);
+  };
+
+  const handleVerifyOTP = () => {
+    setErr("");
+    if (!otpStore) return;
+    if (Date.now() > otpStore.expires) {
+      setErr("OTP has expired. Please request a new one.");
+      setOtpStore(null);
+      setStep("empid");
+      return;
+    }
+    if (otpInput.trim() !== otpStore.code) {
+      setErr("Invalid OTP. Please try again.");
+      return;
+    }
+    // Success — log the login and proceed
+    const d = drivers.find(x => x.id === otpStore.driverId);
+    const loginEntry = { ts: new Date().toLocaleString(), empId: d.empId };
+    setDrivers(prev => prev.map(x => x.id === d.id
+      ? { ...x, loginLog: [...(x.loginLog||[]).slice(-19), loginEntry] }
+      : x
+    ));
+    onLogin({ role:"driver", name:d.name, driverId:d.id, empId:d.empId, loginTime: Date.now() });
+  };
+
+  const handleResend = () => {
+    if (resendCooldown > 0) return;
+    const d = drivers.find(x => x.empId === empId.trim());
+    if (d) sendOTP(d);
+  };
+
+  const resetDriverFlow = () => { setStep("empid"); setEmpId(""); setOtpInput(""); setOtpStore(null); setErr(""); setInfo(""); };
+
+  const adminSubmit = () => {
+    setErr("");
+    if (pass === "admin123") onLogin({ role:"admin", name:"Administrator" });
+    else setErr("Invalid password.");
+  };
+
+  const logoBox = (
+    <div style={{ textAlign:"center", marginBottom:28 }}>
+      <div style={{ width:52, height:52, background:"#2E7CF6", borderRadius:14, margin:"0 auto 12px", display:"flex", alignItems:"center", justifyContent:"center" }}>
+        <Icon n="vehicle" size={28} color="#fff"/>
+      </div>
+      <h1 style={{ fontSize:22, fontWeight:800, color:"#0F1C2E", margin:0 }}>Travel Desk</h1>
+      <p style={{ color:"#64748B", fontSize:13, margin:"4px 0 0" }}>Fleet & Trip Management</p>
+    </div>
+  );
+
+  return (
+    <div style={C.loginWrap}>
+      <div style={C.loginCard}>
+        {logoBox}
+        {/* Tab switcher */}
+        <div style={{ display:"flex", gap:6, marginBottom:20, background:"#F1F5F9", borderRadius:8, padding:4 }}>
+          {["admin","driver"].map(m => (
+            <button key={m} onClick={() => { setMode(m); setErr(""); setInfo(""); resetDriverFlow(); }} style={{ flex:1, padding:"8px 0", borderRadius:6, border:"none", fontWeight:600, fontSize:13, cursor:"pointer", background:mode===m?"#fff":"transparent", color:mode===m?"#0F1C2E":"#64748B", boxShadow:mode===m?"0 1px 3px rgba(0,0,0,.12)":"none" }}>
+              {m === "admin" ? "Admin" : "Driver"}
+            </button>
+          ))}
+        </div>
+
+        {mode === "admin" ? (
+          <>
+            <FormField label="Password">
+              <Inp type="password" placeholder="Enter admin password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&adminSubmit()}/>
+            </FormField>
+            {err && <p style={{ color:"#EF4444", fontSize:12, marginTop:8 }}>{err}</p>}
+            <button style={{ ...C.btn("primary"), width:"100%", justifyContent:"center", marginTop:18, padding:"11px 0", fontSize:14 }} onClick={adminSubmit}>Sign In</button>
+            <p style={{ fontSize:11, color:"#94A3B8", textAlign:"center", marginTop:14 }}>Admin password: admin123</p>
+          </>
+        ) : step === "empid" ? (
+          <>
+            <div style={{ fontSize:13, color:"#475569", marginBottom:14, lineHeight:1.5 }}>Enter your Employee ID to receive a One-Time Password on your registered mobile number.</div>
+            <FormField label="Employee ID">
+              <Inp placeholder="e.g. EMP101" value={empId} onChange={e=>setEmpId(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleVerifyEmpId()}/>
+            </FormField>
+            {err && <p style={{ color:"#EF4444", fontSize:12, marginTop:8 }}>{err}</p>}
+            <button style={{ ...C.btn("primary"), width:"100%", justifyContent:"center", marginTop:18, padding:"11px 0", fontSize:14 }} onClick={handleVerifyEmpId}>Send OTP</button>
+            <p style={{ fontSize:11, color:"#94A3B8", textAlign:"center", marginTop:14 }}>Demo drivers: EMP101, EMP102, EMP104</p>
+          </>
+        ) : (
+          <>
+            <div style={{ background:"#EFF6FF", border:"1px solid #BFDBFE", borderRadius:8, padding:"10px 14px", marginBottom:16 }}>
+              <div style={{ fontSize:13, color:"#1D4ED8", fontWeight:600 }}>OTP Sent</div>
+              <div style={{ fontSize:12, color:"#374151", marginTop:2 }}>A 6-digit OTP has been sent to {otpStore?.maskedMobile}. It is valid for 5 minutes.</div>
+            </div>
+            {info && <div style={{ background:"#FEF9C3", border:"1px solid #FDE047", borderRadius:7, padding:"8px 12px", fontSize:12, color:"#713F12", marginBottom:12 }}>{info}</div>}
+            <FormField label="Enter OTP">
+              <Inp
+                placeholder="6-digit OTP"
+                value={otpInput}
+                onChange={e=>setOtpInput(e.target.value.replace(/\D/g,"").slice(0,6))}
+                onKeyDown={e=>e.key==="Enter"&&handleVerifyOTP()}
+                style={{ ...C.input, letterSpacing:6, fontSize:20, textAlign:"center", fontWeight:700 }}
+                maxLength={6}
+              />
+            </FormField>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:8 }}>
+              <button
+                style={{ background:"none", border:"none", fontSize:12, cursor:resendCooldown>0?"default":"pointer", color:resendCooldown>0?"#94A3B8":"#2E7CF6", fontWeight:600 }}
+                onClick={handleResend}
+                disabled={resendCooldown>0}
+              >
+                {resendCooldown > 0 ? `Resend OTP in ${resendCooldown}s` : "Resend OTP"}
+              </button>
+              <button style={{ background:"none", border:"none", fontSize:12, cursor:"pointer", color:"#64748B" }} onClick={resetDriverFlow}>← Change ID</button>
+            </div>
+            {err && <p style={{ color:"#EF4444", fontSize:12, marginTop:8 }}>{err}</p>}
+            <button style={{ ...C.btn("primary"), width:"100%", justifyContent:"center", marginTop:18, padding:"11px 0", fontSize:14 }} onClick={handleVerifyOTP}>Verify & Sign In</button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Dashboard ─────────────────────────────────────────────────────────────────
+function Dashboard({ vehicles, drivers, trips, docs }) {
+  const alerts = useMemo(() => {
+    const out = [];
+    vehicles.forEach(v => {
+      [["insuranceExpiry","Insurance"],["pucExpiry","PUC"],["fitnessExpiry","Fitness"],["roadTaxExpiry","Road Tax"],["permitExpiry","Permit"]].forEach(([k,label]) => {
+        const days = daysUntil(v[k]);
+        if (days < 0) out.push({ type:"danger", msg:`${v.number}: ${label} expired ${Math.abs(days)} days ago` });
+        else if (days <= 30) out.push({ type:"warn", msg:`${v.number}: ${label} expires in ${days} days` });
+      });
+    });
+    drivers.forEach(d => {
+      const days = daysUntil(d.licenseExpiry);
+      if (days < 0) out.push({ type:"danger", msg:`${d.name}: License expired ${Math.abs(days)} days ago` });
+      else if (days <= 60) out.push({ type:"warn", msg:`${d.name}: License expires in ${days} days` });
+    });
+    return out.slice(0,8);
+  }, [vehicles, drivers]);
+
+  const upcoming = trips.filter(t => t.status === "Approved" || t.status === "Vehicle Assigned" || t.status === "Driver Assigned");
+  const active = trips.filter(t => t.status === "Trip Started");
+
+  // Mini bar chart
+  const statusCounts = VEHICLE_STATUSES.map(s => ({ label:s, count:vehicles.filter(v=>v.status===s).length }));
+  const maxCount = Math.max(...statusCounts.map(x=>x.count), 1);
+
+  return (
+    <div>
+      <div style={C.statsGrid}>
+        <Stat label="Total Vehicles" value={vehicles.length} accent="#2E7CF6"/>
+        <Stat label="Available" value={vehicles.filter(v=>v.status==="Available").length} accent="#10B981"/>
+        <Stat label="On Trip" value={vehicles.filter(v=>v.status==="On Trip").length} accent="#2E7CF6"/>
+        <Stat label="Under Maintenance" value={vehicles.filter(v=>v.status==="Under Maintenance").length} accent="#F59E0B"/>
+        <Stat label="Total Drivers" value={drivers.length} accent="#8B5CF6"/>
+        <Stat label="Available Drivers" value={drivers.filter(d=>d.status==="Available").length} accent="#10B981"/>
+        <Stat label="Active Trips" value={active.length} accent="#EF4444"/>
+        <Stat label="Upcoming Trips" value={upcoming.length} accent="#EC4899"/>
+      </div>
+
+      <div style={C.sectionGrid}>
+        {/* Alerts */}
+        <div style={{ ...C.tableWrap }}>
+          <div style={C.tableHeader}><span style={C.tableTitle}>🔔 Expiry Alerts</span></div>
+          <div style={{ padding:"12px 16px", maxHeight:260, overflowY:"auto" }}>
+            {alerts.length === 0 && <p style={C.emptyState}>No alerts — all documents current!</p>}
+            {alerts.map((a,i) => <Alert key={i} type={a.type}>{a.msg}</Alert>)}
+          </div>
+        </div>
+        {/* Vehicle Fleet Status */}
+        <div style={C.tableWrap}>
+          <div style={C.tableHeader}><span style={C.tableTitle}>Fleet Status</span></div>
+          <div style={{ padding:"16px 20px" }}>
+            {statusCounts.map(({ label, count }) => (
+              <div key={label} style={{ marginBottom:12 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", fontSize:12, marginBottom:4 }}>
+                  <span style={{ color:"#374151", fontWeight:500 }}>{label}</span>
+                  <span style={{ color:"#64748B" }}>{count} vehicle{count!==1?"s":""}</span>
+                </div>
+                <div style={{ background:"#F1F5F9", borderRadius:4, height:8, overflow:"hidden" }}>
+                  <div style={{ width:`${(count/maxCount)*100}%`, height:"100%", background:statusColor(label), borderRadius:4, transition:"width .4s" }}/>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Recent Trips */}
+      <div style={C.tableWrap}>
+        <div style={C.tableHeader}><span style={C.tableTitle}>Recent Trips</span></div>
+        <table style={C.table}>
+          <thead><tr>
+            {["Trip ID","Date","Route","Purpose","Status"].map(h=><th key={h} style={C.th}>{h}</th>)}
+          </tr></thead>
+          <tbody>
+            {trips.slice(0,6).map(t => (
+              <tr key={t.id}>
+                <td style={C.td}><span style={{ fontFamily:"monospace", color:"#2E7CF6" }}>{t.id}</span></td>
+                <td style={C.td}>{fmtDate(t.date)} {t.time}</td>
+                <td style={C.td}><span style={{ fontSize:12 }}>{t.pickup} → {t.destination}</span></td>
+                <td style={C.td}>{t.purpose}</td>
+                <td style={C.td}><Badge status={t.status}/></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── Vehicle Management ────────────────────────────────────────────────────────
+function VehicleForm({ vehicle, drivers, onSave, onClose }) {
+  const [f, setF] = useState(vehicle || { id:"V"+uid(), number:"", type:"Sedan", make:"", model:"", capacity:5, fuel:"Diesel", owner:"GITAM University", driverId:"", status:"Available", purchaseDate:"", insuranceExpiry:"", pucExpiry:"", fitnessExpiry:"", roadTaxExpiry:"", permitExpiry:"", notes:"" });
+  const set = (k,v) => setF(p=>({...p,[k]:v}));
+  return (
+    <div style={C.form}>
+      <div style={C.formGrid}>
+        <FormField label="Vehicle Number *"><Inp value={f.number} onChange={e=>set("number",e.target.value)} placeholder="KA01AB1234"/></FormField>
+        <FormField label="Vehicle Type"><Sel value={f.type} onChange={e=>set("type",e.target.value)} options={VEHICLE_TYPES}/></FormField>
+        <FormField label="Make"><Inp value={f.make} onChange={e=>set("make",e.target.value)} placeholder="Toyota"/></FormField>
+        <FormField label="Model"><Inp value={f.model} onChange={e=>set("model",e.target.value)} placeholder="Fortuner"/></FormField>
+        <FormField label="Seating Capacity"><Inp type="number" value={f.capacity} onChange={e=>set("capacity",+e.target.value)}/></FormField>
+        <FormField label="Fuel Type"><Sel value={f.fuel} onChange={e=>set("fuel",e.target.value)} options={FUEL_TYPES}/></FormField>
+        <FormField label="Owner"><Inp value={f.owner} onChange={e=>set("owner",e.target.value)}/></FormField>
+        <FormField label="Assign Driver"><Sel value={f.driverId} onChange={e=>set("driverId",e.target.value)} options={[{value:"",label:"— None —"},...drivers.map(d=>({value:d.id,label:`${d.name} (${d.empId})`}))]}/></FormField>
+        <FormField label="Status"><Sel value={f.status} onChange={e=>set("status",e.target.value)} options={VEHICLE_STATUSES}/></FormField>
+        <FormField label="Purchase / Reg. Date"><Inp type="date" value={f.purchaseDate} onChange={e=>set("purchaseDate",e.target.value)}/></FormField>
+        <FormField label="Insurance Expiry"><Inp type="date" value={f.insuranceExpiry} onChange={e=>set("insuranceExpiry",e.target.value)}/></FormField>
+        <FormField label="PUC Expiry"><Inp type="date" value={f.pucExpiry} onChange={e=>set("pucExpiry",e.target.value)}/></FormField>
+        <FormField label="Fitness Certificate Expiry"><Inp type="date" value={f.fitnessExpiry} onChange={e=>set("fitnessExpiry",e.target.value)}/></FormField>
+        <FormField label="Road Tax Expiry"><Inp type="date" value={f.roadTaxExpiry} onChange={e=>set("roadTaxExpiry",e.target.value)}/></FormField>
+        <FormField label="Permit Expiry"><Inp type="date" value={f.permitExpiry} onChange={e=>set("permitExpiry",e.target.value)}/></FormField>
+      </div>
+      <div style={{ gridColumn:"1/-1", marginTop:8 }}>
+        <FormField label="Notes / Additional Info"><textarea style={{ ...C.input, minHeight:60, resize:"vertical", width:"100%", boxSizing:"border-box" }} value={f.notes} onChange={e=>set("notes",e.target.value)}/></FormField>
+      </div>
+      <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:20 }}>
+        <button style={C.btn("ghost")} onClick={onClose}>Cancel</button>
+        <button style={C.btn("primary")} onClick={() => { if(!f.number.trim()) return alert("Vehicle number required"); onSave(f); }}>Save Vehicle</button>
+      </div>
+    </div>
+  );
+}
+
+function Vehicles({ vehicles, setVehicles, drivers }) {
+  const [modal, setModal] = useState(null);
+  const [search, setSearch] = useState("");
+  const [filterType, setFilterType] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+
+  const filtered = vehicles.filter(v => {
+    const q = search.toLowerCase();
+    return (!q || v.number.toLowerCase().includes(q) || v.make.toLowerCase().includes(q) || v.model.toLowerCase().includes(q))
+      && (!filterType || v.type === filterType)
+      && (!filterStatus || v.status === filterStatus);
+  });
+
+  const save = (v) => {
+    setVehicles(p => p.find(x=>x.id===v.id) ? p.map(x=>x.id===v.id?v:x) : [...p,v]);
+    setModal(null);
+  };
+
+  const del = (id) => { if (window.confirm("Delete vehicle?")) setVehicles(p=>p.filter(x=>x.id!==id)); };
+
+  const getDriver = (dId) => drivers.find(d => d.id === dId);
+
+  const expiryWarn = (v) => {
+    const fields = ["insuranceExpiry","pucExpiry","fitnessExpiry","roadTaxExpiry","permitExpiry"];
+    return fields.some(k => { const days = daysUntil(v[k]); return days >= 0 && days <= 30; });
+  };
+
+  return (
+    <div>
+      <div style={C.tableWrap}>
+        <div style={C.tableHeader}>
+          <span style={C.tableTitle}>Vehicle Fleet ({filtered.length})</span>
+          <button style={C.btn("primary")} onClick={() => setModal({ mode:"add" })}><Icon n="plus" size={16} color="#fff"/> Add Vehicle</button>
+        </div>
+        <div style={C.filterRow}>
+          <SearchBox value={search} onChange={setSearch} placeholder="Search by number, make, model…"/>
+          <select style={{ ...C.select, minWidth:130, width:"auto" }} value={filterType} onChange={e=>setFilterType(e.target.value)}>
+            <option value="">All Types</option>
+            {VEHICLE_TYPES.map(t=><option key={t}>{t}</option>)}
+          </select>
+          <select style={{ ...C.select, minWidth:150, width:"auto" }} value={filterStatus} onChange={e=>setFilterStatus(e.target.value)}>
+            <option value="">All Statuses</option>
+            {VEHICLE_STATUSES.map(s=><option key={s}>{s}</option>)}
+          </select>
+        </div>
+        <div style={{ overflowX:"auto" }}>
+          <table style={C.table}>
+            <thead><tr>
+              {["Number","Type","Make / Model","Capacity","Fuel","Driver","Status","Insurance","PUC","Actions"].map(h=><th key={h} style={C.th}>{h}</th>)}
+            </tr></thead>
+            <tbody>
+              {filtered.length === 0 && <tr><td colSpan={10} style={{ ...C.td, ...C.emptyState }}>No vehicles found</td></tr>}
+              {filtered.map(v => {
+                const drv = getDriver(v.driverId);
+                return (
+                  <tr key={v.id} style={{ background: expiryWarn(v) ? "#FFFBEB" : "" }}>
+                    <td style={C.td}><strong style={{ color:"#0F1C2E" }}>{v.number}</strong></td>
+                    <td style={C.td}>{v.type}</td>
+                    <td style={C.td}>{v.make} {v.model}</td>
+                    <td style={C.td}>{v.capacity}</td>
+                    <td style={C.td}>{v.fuel}</td>
+                    <td style={C.td}>{drv ? <span style={{ fontSize:12 }}>{drv.name}</span> : <span style={{ color:"#94A3B8" }}>Unassigned</span>}</td>
+                    <td style={C.td}><Badge status={v.status}/></td>
+                    <td style={C.td}><span style={C.chip(statusColor(expiryStatus(v.insuranceExpiry)))}>{fmtDate(v.insuranceExpiry)}</span></td>
+                    <td style={C.td}><span style={C.chip(statusColor(expiryStatus(v.pucExpiry)))}>{fmtDate(v.pucExpiry)}</span></td>
+                    <td style={C.td}>
+                      <div style={C.row}>
+                        <button style={{ ...C.iconBtn, color:"#2E7CF6" }} title="Edit" onClick={() => setModal({ mode:"edit", vehicle:v })}><Icon n="edit" size={16} color="#2E7CF6"/></button>
+                        <button style={{ ...C.iconBtn }} title="Delete" onClick={() => del(v.id)}><Icon n="trash" size={16} color="#EF4444"/></button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {modal && (
+        <Modal title={modal.mode==="add"?"Add New Vehicle":"Edit Vehicle"} onClose={() => setModal(null)} wide>
+          <VehicleForm vehicle={modal.vehicle} drivers={drivers} onSave={save} onClose={() => setModal(null)}/>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ─── Documents ─────────────────────────────────────────────────────────────────
+const ALL_DOC_TYPES_ORDERED = ["Registration Certificate","Insurance","PUC","Fitness","Road Tax","Vehicle Permit","Driver License","Other","Trip Sheet Scan"];
+
+function DocViewerModal({ doc, onClose }) {
+  if (!doc || !doc.fileData) return null;
+  const isImage = doc.fileData.startsWith("data:image");
+  const isPdf = doc.fileData.startsWith("data:application/pdf");
+  return (
+    <div style={C.modal} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background:"#fff", borderRadius:12, width:"100%", maxWidth:820, maxHeight:"92vh", display:"flex", flexDirection:"column", boxShadow:"0 20px 60px rgba(0,0,0,.35)", overflow:"hidden" }}>
+        <div style={{ ...C.modalHead, flexShrink:0 }}>
+          <div>
+            <div style={C.modalTitle}>{doc.name}</div>
+            <div style={{ fontSize:12, color:"#64748B", marginTop:2 }}>{doc.type} — {doc.fileName}</div>
+          </div>
+          <div style={{ display:"flex", gap:8 }}>
+            <a href={doc.fileData} download={doc.fileName} style={{ ...C.btn("success"), textDecoration:"none" }}><Icon n="download" size={15} color="#fff"/> Download</a>
+            <button style={C.iconBtn} onClick={onClose}><Icon n="close" size={20} color="#64748B"/></button>
+          </div>
+        </div>
+        <div style={{ flex:1, overflow:"auto", background:"#F0F4F9", display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
+          {isImage && <img src={doc.fileData} alt={doc.name} style={{ maxWidth:"100%", maxHeight:"75vh", borderRadius:6, boxShadow:"0 4px 16px rgba(0,0,0,.15)" }}/>}
+          {isPdf && <iframe src={doc.fileData} title={doc.name} style={{ width:"100%", height:"75vh", border:"none", borderRadius:6 }}/>}
+          {!isImage && !isPdf && <div style={{ color:"#64748B", fontSize:14 }}>Preview not available. Use Download to open.</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const VEHICLE_VIEW_DOC_TYPES = ALL_DOC_TYPES_ORDERED.filter(t => t !== "Trip Sheet Scan");
+
+function VehicleDocCard({ vehicle, docs, onUpload, onView, onDelete }) {
+  const vDocs = docs.filter(d => d.vehicleId === vehicle.id);
+  const getDoc = (type) => vDocs.find(d => d.type === type);
+
+  return (
+    <div style={{ background:"#fff", borderRadius:10, boxShadow:"0 1px 4px rgba(0,0,0,.08)", overflow:"hidden", marginBottom:16 }}>
+      {/* Card header */}
+      <div style={{ background:"#0F1C2E", padding:"12px 16px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+          <Icon n="vehicle" size={18} color="#2E7CF6"/>
+          <div>
+            <div style={{ color:"#fff", fontWeight:700, fontSize:14 }}>{vehicle.number}</div>
+            <div style={{ color:"#94A3B8", fontSize:11 }}>{vehicle.make} {vehicle.model} · {vehicle.type}</div>
+          </div>
+        </div>
+        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+          <span style={C.badge(statusColor(vehicle.status))}>{vehicle.status}</span>
+          <button style={{ ...C.btn("primary"), padding:"5px 12px", fontSize:12 }} onClick={() => onUpload(vehicle.id)}>
+            <Icon n="plus" size={13} color="#fff"/> Add Doc
+          </button>
+        </div>
+      </div>
+      {/* Document grid */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:1, background:"#E2E8F0" }}>
+        {VEHICLE_VIEW_DOC_TYPES.map(type => {
+          const doc = getDoc(type);
+          const s = doc ? (doc.expiryDate ? expiryStatus(doc.expiryDate) : "Valid") : null;
+          const col = s ? statusColor(s) : "#D1D5DB";
+          return (
+            <div key={type} style={{ background:"#fff", padding:"12px 14px", display:"flex", flexDirection:"column", gap:6, minHeight:90 }}>
+              <div style={{ fontSize:11, fontWeight:700, color:"#64748B", textTransform:"uppercase", letterSpacing:"0.4px" }}>{type}</div>
+              {doc ? (
+                <>
+                  <div style={{ fontSize:12, fontWeight:600, color:"#0F1C2E", flex:1, lineHeight:1.3 }}>{doc.name}</div>
+                  {doc.expiryDate && <div style={C.chip(col)}>{fmtDate(doc.expiryDate)}</div>}
+                  {!doc.expiryDate && <div style={{ fontSize:11, color:"#94A3B8" }}>No expiry</div>}
+                  <div style={{ display:"flex", gap:4, marginTop:2 }}>
+                    {doc.fileData && <button style={{ ...C.iconBtn, background:"#EFF6FF", borderRadius:4, padding:"3px 7px" }} title="View scan" onClick={() => onView(doc)}><Icon n="eye" size={13} color="#2E7CF6"/></button>}
+                    {!doc.fileData && <span style={{ fontSize:10, color:"#F59E0B", fontStyle:"italic" }}>No scan</span>}
+                    <button style={{ ...C.iconBtn, background:"#FFF7ED", borderRadius:4, padding:"3px 7px" }} title="Delete" onClick={() => onDelete(doc.id)}><Icon n="trash" size={13} color="#EF4444"/></button>
+                  </div>
+                </>
+              ) : (
+                <div style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:4 }}>
+                  <div style={{ width:28, height:28, borderRadius:99, background:"#F1F5F9", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                    <Icon n="plus" size={14} color="#94A3B8"/>
+                  </div>
+                  <div style={{ fontSize:10, color:"#94A3B8" }}>Not uploaded</div>
+                  <button style={{ fontSize:10, color:"#2E7CF6", background:"none", border:"none", cursor:"pointer", padding:0 }} onClick={() => onUpload(vehicle.id, type)}>Upload</button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function Documents({ docs, setDocs, vehicles }) {
+  const [modal, setModal] = useState(null); // "add"|"edit"|"view"
+  const [viewDoc, setViewDoc] = useState(null);
+  const [filterVehicle, setFilterVehicle] = useState("");
+  const [viewMode, setViewMode] = useState("vehicle"); // "vehicle"|"table"
+  const [search, setSearch] = useState("");
+  const [filterType, setFilterType] = useState("");
+  const [filterFrom, setFilterFrom] = useState("");
+  const [filterTo, setFilterTo] = useState("");
+  const [uploading, setUploading] = useState(false);
+
+  const blank = () => ({ id:"DOC"+uid(), vehicleId:"", name:"", type:"Insurance", uploadDate:today(), expiryDate:"", status:"Valid", fileName:"", fileData:"" });
+  const [f, setF] = useState(blank());
+  const fSet = (k,v) => setF(p=>({...p,[k]:v}));
+
+  const openAdd = (vehicleId="", type="") => {
+    setF({ ...blank(), vehicleId, type: type || "Insurance" });
+    setModal("add");
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      fSet("fileData", ev.target.result);
+      fSet("fileName", file.name);
+      setUploading(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const save = () => {
+    if (!f.vehicleId || !f.name) return alert("Vehicle and document name required");
+    const withStatus = { ...f, status: f.expiryDate ? expiryStatus(f.expiryDate) : "Valid" };
+    setDocs(p => p.find(x=>x.id===f.id) ? p.map(x=>x.id===f.id?withStatus:x) : [...p,withStatus]);
+    setModal(null);
+  };
+
+  const del = (id) => { if (window.confirm("Delete document?")) setDocs(p=>p.filter(x=>x.id!==id)); };
+
+  const filtered = docs.filter(d => {
+    const q = search.toLowerCase();
+    return (!q || d.name.toLowerCase().includes(q))
+      && (!filterVehicle || d.vehicleId === filterVehicle)
+      && (!filterType || d.type === filterType)
+      && (!filterFrom || (d.uploadDate && d.uploadDate >= filterFrom))
+      && (!filterTo || (d.uploadDate && d.uploadDate <= filterTo));
+  });
+
+  const getVehicle = (vid) => vehicles.find(v=>v.id===vid);
+  const displayedVehicles = filterVehicle ? vehicles.filter(v=>v.id===filterVehicle) : vehicles;
+
+  return (
+    <div>
+      <div style={{ ...C.tableWrap, marginBottom:16 }}>
+        <div style={C.tableHeader}>
+          <span style={C.tableTitle}>Vehicle Documents</span>
+          <div style={C.row}>
+            {/* View toggle */}
+            <div style={{ display:"flex", border:"1px solid #E2E8F0", borderRadius:7, overflow:"hidden" }}>
+              {[["vehicle","Vehicle View"],["table","Table View"]].map(([v,label]) => (
+                <button key={v} style={{ padding:"6px 14px", fontSize:12, fontWeight:600, border:"none", cursor:"pointer", background:viewMode===v?"#2E7CF6":"#fff", color:viewMode===v?"#fff":"#64748B" }} onClick={() => setViewMode(v)}>{label}</button>
+              ))}
+            </div>
+            <button style={C.btn("primary")} onClick={() => openAdd()}><Icon n="plus" size={16} color="#fff"/> Upload Document</button>
+          </div>
+        </div>
+        <div style={C.filterRow}>
+          <SearchBox value={search} onChange={setSearch} placeholder="Search document name…"/>
+          <select style={{ ...C.select, minWidth:160, width:"auto" }} value={filterVehicle} onChange={e=>setFilterVehicle(e.target.value)}>
+            <option value="">All Vehicles</option>
+            {vehicles.map(v=><option key={v.id} value={v.id}>{v.number}</option>)}
+          </select>
+          {viewMode === "table" && (
+            <select style={{ ...C.select, minWidth:160, width:"auto" }} value={filterType} onChange={e=>setFilterType(e.target.value)}>
+              <option value="">All Types</option>
+              {ALL_DOC_TYPES_ORDERED.map(t=><option key={t}>{t}</option>)}
+            </select>
+          )}
+          {viewMode === "table" && (
+            <div style={{ display:"flex", gap:8, alignItems:"center", marginLeft:"auto" }}>
+              <span style={{ fontSize:12, color:"#64748B" }}>From:</span>
+              <input type="date" style={{ ...C.input, padding:"6px 10px" }} value={filterFrom} onChange={e=>setFilterFrom(e.target.value)}/>
+              <span style={{ fontSize:12, color:"#64748B" }}>To:</span>
+              <input type="date" style={{ ...C.input, padding:"6px 10px" }} value={filterTo} onChange={e=>setFilterTo(e.target.value)}/>
+              {(filterFrom || filterTo) && (
+                <button style={{ ...C.btn("ghost"), padding:"6px 10px", fontSize:12 }} onClick={()=>{setFilterFrom("");setFilterTo("");}}>Clear</button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Vehicle Card View ─────────────────────────────────────────── */}
+      {viewMode === "vehicle" && (
+        <div>
+          {displayedVehicles.length === 0 && <div style={{ ...C.emptyState, background:"#fff", borderRadius:10, padding:48 }}>No vehicles found</div>}
+          {displayedVehicles.map(v => (
+            <VehicleDocCard
+              key={v.id}
+              vehicle={v}
+              docs={docs}
+              onUpload={(vid, type) => openAdd(vid, type)}
+              onView={(doc) => { setViewDoc(doc); setModal("view"); }}
+              onDelete={del}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* ── Table View ───────────────────────────────────────────────── */}
+      {viewMode === "table" && (
+        <div style={C.tableWrap}>
+          <div style={{ overflowX:"auto" }}>
+            <table style={C.table}>
+              <thead><tr>
+                {["Vehicle","Document Name","Type","Upload Date","Expiry","Status","Scan","Actions"].map(h=><th key={h} style={C.th}>{h}</th>)}
+              </tr></thead>
+              <tbody>
+                {filtered.length===0 && <tr><td colSpan={8} style={{ ...C.td, textAlign:"center", color:"#94A3B8" }}>No documents found</td></tr>}
+                {filtered.map(d => {
+                  const v = getVehicle(d.vehicleId);
+                  const s = d.expiryDate ? expiryStatus(d.expiryDate) : "Valid";
+                  return (
+                    <tr key={d.id}>
+                      <td style={C.td}>{v ? <span style={{ fontWeight:600, color:"#2E7CF6" }}>{v.number}</span> : "—"}</td>
+                      <td style={C.td}><div style={{ display:"flex", alignItems:"center", gap:8 }}><Icon n="doc" size={15} color="#64748B"/>{d.name}</div></td>
+                      <td style={C.td}><span style={C.chip("#64748B")}>{d.type}</span></td>
+                      <td style={C.td}>{fmtDate(d.uploadDate)}</td>
+                      <td style={C.td}>{d.expiryDate ? <span style={C.chip(statusColor(s))}>{fmtDate(d.expiryDate)}</span> : <span style={{ color:"#94A3B8" }}>N/A</span>}</td>
+                      <td style={C.td}><Badge status={s}/></td>
+                      <td style={C.td}>
+                        {d.fileData
+                          ? <button style={{ ...C.iconBtn, background:"#EFF6FF", borderRadius:5, padding:"4px 10px", fontSize:12, color:"#2E7CF6", fontWeight:600 }} onClick={() => { setViewDoc(d); setModal("view"); }}><Icon n="eye" size={14} color="#2E7CF6"/> View</button>
+                          : <span style={{ fontSize:11, color:"#F59E0B", fontWeight:600 }}>Not uploaded</span>}
+                      </td>
+                      <td style={C.td}>
+                        {d.type === "Trip Sheet Scan" ? (
+                          <div style={C.row}>
+                            {d.fileData && <a href={d.fileData} download={d.fileName} style={C.iconBtn} title="Download"><Icon n="download" size={16} color="#10B981"/></a>}
+                            <span style={{ fontSize:11, color:"#8B5CF6", fontWeight:600, padding:"2px 8px", background:"#F3F0FF", borderRadius:4 }}>Driver Upload</span>
+                          </div>
+                        ) : (
+                          <div style={C.row}>
+                            {d.fileData && <a href={d.fileData} download={d.fileName} style={C.iconBtn} title="Download"><Icon n="download" size={16} color="#10B981"/></a>}
+                            <button style={C.iconBtn} title="Edit" onClick={() => { setF({...d}); setModal("edit"); }}><Icon n="edit" size={16} color="#F59E0B"/></button>
+                            <button style={C.iconBtn} title="Delete" onClick={() => del(d.id)}><Icon n="trash" size={16} color="#EF4444"/></button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── Upload/Edit Modal ─────────────────────────────────────────── */}
+      {(modal === "add" || modal === "edit") && (
+        <Modal title={modal==="add"?"Upload Document":"Update Document"} onClose={() => setModal(null)}>
+          <div style={C.form}>
+            <div style={C.formGrid}>
+              <FormField label="Vehicle *">
+                <Sel value={f.vehicleId} onChange={e=>fSet("vehicleId",e.target.value)} options={[{value:"",label:"Select vehicle"},...vehicles.map(v=>({value:v.id,label:v.number}))]}/>
+              </FormField>
+              <FormField label="Document Type">
+                <Sel value={f.type} onChange={e=>fSet("type",e.target.value)} options={ALL_DOC_TYPES_ORDERED}/>
+              </FormField>
+              <FormField label="Document Name *"><Inp value={f.name} onChange={e=>fSet("name",e.target.value)} placeholder="e.g. Insurance Policy 2025"/></FormField>
+              <FormField label="Upload Date"><Inp type="date" value={f.uploadDate} onChange={e=>fSet("uploadDate",e.target.value)}/></FormField>
+              <FormField label="Expiry Date (if applicable)"><Inp type="date" value={f.expiryDate} onChange={e=>fSet("expiryDate",e.target.value)}/></FormField>
+            </div>
+            {/* File upload */}
+            <div style={{ marginTop:14, border:"2px dashed #D1D5DB", borderRadius:8, padding:"20px 16px", textAlign:"center", background:"#F8FAFC" }}>
+              <div style={{ fontSize:13, color:"#64748B", marginBottom:10 }}>
+                <Icon n="doc" size={20} color="#94A3B8"/>
+                <div style={{ marginTop:6, fontWeight:600 }}>Upload Scanned Document</div>
+                <div style={{ fontSize:11, color:"#94A3B8", marginTop:2 }}>Supports PDF, JPG, PNG (stored locally)</div>
+              </div>
+              <input
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,.webp"
+                id="docFileInput"
+                style={{ display:"none" }}
+                onChange={handleFileChange}
+              />
+              <label htmlFor="docFileInput" style={{ ...C.btn("ghost"), cursor:"pointer", display:"inline-flex" }}>
+                {uploading ? "Reading file…" : f.fileData ? "Replace File" : "Choose File"}
+              </label>
+              {f.fileData && !uploading && (
+                <div style={{ marginTop:10, display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
+                  <Icon n="check" size={15} color="#10B981"/>
+                  <span style={{ fontSize:12, color:"#10B981", fontWeight:600 }}>{f.fileName}</span>
+                  <button style={{ ...C.iconBtn, fontSize:11, color:"#EF4444" }} onClick={() => { fSet("fileData",""); fSet("fileName",""); }}>Remove</button>
+                </div>
+              )}
+            </div>
+            <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:20 }}>
+              <button style={C.btn("ghost")} onClick={() => setModal(null)}>Cancel</button>
+              <button style={C.btn("primary")} onClick={save}>Save Document</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── Document Viewer Modal ─────────────────────────────────────── */}
+      {modal === "view" && viewDoc && <DocViewerModal doc={viewDoc} onClose={() => { setModal(null); setViewDoc(null); }}/>}
+    </div>
+  );
+}
+
+// ─── Driver Management ─────────────────────────────────────────────────────────
+function DriverForm({ driver, vehicles, onSave, onClose }) {
+  const [f, setF] = useState(driver || { id:"D"+uid(), empId:"", name:"", mobile:"", licenseNo:"", licenseExpiry:"", vehicleId:"", status:"Available", address:"", active:true, loginLog:[] });
+  const set = (k,v) => setF(p=>({...p,[k]:v}));
+  return (
+    <div style={C.form}>
+      <div style={C.formGrid}>
+        <FormField label="Employee ID *"><Inp value={f.empId} onChange={e=>set("empId",e.target.value)} placeholder="EMP101"/></FormField>
+        <FormField label="Full Name *"><Inp value={f.name} onChange={e=>set("name",e.target.value)} placeholder="Rajesh Kumar"/></FormField>
+        <FormField label="Registered Mobile (OTP) *"><Inp value={f.mobile} onChange={e=>set("mobile",e.target.value)} placeholder="9876543210" maxLength={10}/></FormField>
+        <FormField label="License Number"><Inp value={f.licenseNo} onChange={e=>set("licenseNo",e.target.value)}/></FormField>
+        <FormField label="License Expiry"><Inp type="date" value={f.licenseExpiry} onChange={e=>set("licenseExpiry",e.target.value)}/></FormField>
+        <FormField label="Assign Vehicle">
+          <Sel value={f.vehicleId} onChange={e=>set("vehicleId",e.target.value)} options={[{value:"",label:"— None —"},...vehicles.map(v=>({value:v.id,label:`${v.number} (${v.type})`}))]}/>
+        </FormField>
+        <FormField label="Operational Status"><Sel value={f.status} onChange={e=>set("status",e.target.value)} options={DRIVER_STATUSES}/></FormField>
+        <FormField label="Address"><Inp value={f.address} onChange={e=>set("address",e.target.value)}/></FormField>
+        <FormField label="System Access">
+          <div style={{ display:"flex", alignItems:"center", gap:10, paddingTop:6 }}>
+            <div
+              onClick={() => set("active", !f.active)}
+              style={{ width:40, height:22, borderRadius:99, background:f.active?"#10B981":"#D1D5DB", cursor:"pointer", position:"relative", transition:"background .2s" }}
+            >
+              <div style={{ position:"absolute", top:3, left:f.active?20:3, width:16, height:16, borderRadius:99, background:"#fff", transition:"left .2s", boxShadow:"0 1px 3px rgba(0,0,0,.2)" }}/>
+            </div>
+            <span style={{ fontSize:13, color:f.active?"#10B981":"#EF4444", fontWeight:600 }}>{f.active?"Active":"Deactivated"}</span>
+          </div>
+        </FormField>
+      </div>
+      <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:20 }}>
+        <button style={C.btn("ghost")} onClick={onClose}>Cancel</button>
+        <button style={C.btn("primary")} onClick={() => { if(!f.empId||!f.name||!f.mobile) return alert("EmpID, name and mobile are required"); onSave(f); }}>Save Driver</button>
+      </div>
+    </div>
+  );
+}
+
+function Drivers({ drivers, setDrivers, vehicles }) {
+  const [modal, setModal] = useState(null);
+  const [search, setSearch] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+
+  const filtered = drivers.filter(d => {
+    const q = search.toLowerCase();
+    return (!q || d.name.toLowerCase().includes(q) || d.empId.toLowerCase().includes(q) || d.mobile.includes(q))
+      && (!filterStatus || d.status === filterStatus);
+  });
+
+  const save = (d) => {
+    setDrivers(p => p.find(x=>x.id===d.id) ? p.map(x=>x.id===d.id?d:x) : [...p,d]);
+    setModal(null);
+  };
+
+  const del = (id) => { if (window.confirm("Delete driver?")) setDrivers(p=>p.filter(x=>x.id!==id)); };
+  const getVehicle = (vid) => vehicles.find(v=>v.id===vid);
+  const toggleAccess = (d) => setDrivers(p => p.map(x => x.id===d.id ? {...x, active:!x.active} : x));
+  const resetAccess = (d) => { if (window.confirm(`Reset login access for ${d.name}? Their next login will require a fresh OTP.`)) { /* In production: invalidate sessions */ alert("Access reset. Driver must log in again via OTP."); } };
+
+  return (
+    <div>
+      <div style={C.tableWrap}>
+        <div style={C.tableHeader}>
+          <span style={C.tableTitle}>Drivers ({filtered.length})</span>
+          <button style={C.btn("primary")} onClick={() => setModal({ mode:"add" })}><Icon n="plus" size={16} color="#fff"/> Add Driver</button>
+        </div>
+        <div style={C.filterRow}>
+          <SearchBox value={search} onChange={setSearch} placeholder="Search by name, Emp ID, mobile…"/>
+          <select style={{ ...C.select, minWidth:150, width:"auto" }} value={filterStatus} onChange={e=>setFilterStatus(e.target.value)}>
+            <option value="">All Statuses</option>
+            {DRIVER_STATUSES.map(s=><option key={s}>{s}</option>)}
+          </select>
+        </div>
+        <div style={{ overflowX:"auto" }}>
+          <table style={C.table}>
+            <thead><tr>
+              {["Emp ID","Name","Mobile","License Expiry","Vehicle","Status","Access","Actions"].map(h=><th key={h} style={C.th}>{h}</th>)}
+            </tr></thead>
+            <tbody>
+              {filtered.length===0 && <tr><td colSpan={8} style={{ ...C.td, textAlign:"center", color:"#94A3B8" }}>No drivers found</td></tr>}
+              {filtered.map(d => {
+                const v = getVehicle(d.vehicleId);
+                return (
+                  <tr key={d.id}>
+                    <td style={C.td}><span style={{ fontFamily:"monospace", color:"#2E7CF6" }}>{d.empId}</span></td>
+                    <td style={C.td}><strong>{d.name}</strong></td>
+                    <td style={C.td}>{d.mobile || <span style={{color:"#EF4444",fontSize:12}}>No mobile!</span>}</td>
+                    <td style={C.td}>
+                      {d.licenseExpiry ? <span style={C.chip(statusColor(expiryStatus(d.licenseExpiry)))}>{fmtDate(d.licenseExpiry)}</span> : "—"}
+                    </td>
+                    <td style={C.td}>{v ? <span style={{ fontSize:12, fontWeight:500 }}>{v.number}</span> : <span style={{ color:"#94A3B8" }}>Unassigned</span>}</td>
+                    <td style={C.td}><Badge status={d.status}/></td>
+                    <td style={C.td}>
+                      <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                        <div
+                          onClick={() => toggleAccess(d)}
+                          title={d.active?"Click to deactivate":"Click to activate"}
+                          style={{ width:36, height:20, borderRadius:99, background:d.active!==false?"#10B981":"#D1D5DB", cursor:"pointer", position:"relative", transition:"background .2s", flexShrink:0 }}
+                        >
+                          <div style={{ position:"absolute", top:2, left:d.active!==false?18:2, width:16, height:16, borderRadius:99, background:"#fff", transition:"left .2s", boxShadow:"0 1px 2px rgba(0,0,0,.2)" }}/>
+                        </div>
+                        <span style={{ fontSize:11, color:d.active!==false?"#10B981":"#EF4444", fontWeight:600 }}>{d.active!==false?"Active":"Off"}</span>
+                      </div>
+                    </td>
+                    <td style={C.td}>
+                      <div style={C.row}>
+                        <button style={C.iconBtn} title="Edit Driver" onClick={() => setModal({ mode:"edit", driver:d })}><Icon n="edit" size={16} color="#2E7CF6"/></button>
+                        <button style={C.iconBtn} title="View Login Activity" onClick={() => setModal({ mode:"log", driver:d })}><Icon n="eye" size={16} color="#8B5CF6"/></button>
+                        <button style={C.iconBtn} title="Reset Access" onClick={() => resetAccess(d)}><Icon n="settings" size={16} color="#F59E0B"/></button>
+                        <button style={C.iconBtn} title="Delete" onClick={() => del(d.id)}><Icon n="trash" size={16} color="#EF4444"/></button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {modal && modal.mode !== "log" && (
+        <Modal title={modal.mode==="add"?"Add Driver":"Edit Driver"} onClose={() => setModal(null)}>
+          <DriverForm driver={modal.driver} vehicles={vehicles} onSave={save} onClose={() => setModal(null)}/>
+        </Modal>
+      )}
+      {modal && modal.mode === "log" && (
+        <Modal title={`Login Activity — ${modal.driver.name}`} onClose={() => setModal(null)}>
+          <div style={{ padding:"16px 24px 24px" }}>
+            {(!modal.driver.loginLog || modal.driver.loginLog.length === 0) ? (
+              <p style={{ color:"#94A3B8", fontSize:13 }}>No login activity recorded yet.</p>
+            ) : (
+              <table style={C.table}>
+                <thead><tr>
+                  <th style={C.th}>#</th>
+                  <th style={C.th}>Employee ID</th>
+                  <th style={C.th}>Login Timestamp</th>
+                </tr></thead>
+                <tbody>
+                  {[...modal.driver.loginLog].reverse().map((l,i) => (
+                    <tr key={i}>
+                      <td style={C.td}>{modal.driver.loginLog.length - i}</td>
+                      <td style={C.td}><span style={{ fontFamily:"monospace", color:"#2E7CF6" }}>{l.empId}</span></td>
+                      <td style={C.td}>{l.ts}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ─── Trips ─────────────────────────────────────────────────────────────────────
+function TripForm({ trip, vehicles, drivers, onSave, onClose }) {
+  const defaultF = { id:"T"+uid(), sheetNo:"", vehicleType:"", vehicleId:"", driverId:"", passengerName:"", pickup:"", destination:"", purpose:"", date:"", startTime:"08:00", startKms:"", closeTime:"", closeKms:"", totalKms:"", totalTime:"", remarks:"", status:"Requested", requestedBy:"Admin", createdAt:today() };
+  const [f, setF] = useState(trip || defaultF);
+  const set = (k,v) => setF(p=>({...p,[k]:v}));
+
+  // Auto-compute totals
+  const handleKms = (k,v) => {
+    const updated = {...f,[k]:v};
+    if (updated.startKms && updated.closeKms) {
+      const diff = Number(updated.closeKms) - Number(updated.startKms);
+      if (diff >= 0) updated.totalKms = diff;
+    }
+    setF(updated);
+  };
+
+  const selectedVehicle = vehicles.find(v => v.id === f.vehicleId);
+
+  return (
+    <div style={C.form}>
+      {/* Header info */}
+      <div style={{ background:"#F8FAFC", border:"1px solid #E2E8F0", borderRadius:8, padding:"12px 16px", marginBottom:16, display:"flex", gap:16, alignItems:"center", flexWrap:"wrap" }}>
+        <div style={{ fontWeight:700, fontSize:14, color:"#0F1C2E" }}>TRIP SHEET</div>
+        <FormField label="Sheet No.">
+          <Inp value={f.sheetNo} onChange={e=>set("sheetNo",e.target.value)} placeholder="629" style={{ ...C.input, width:100 }}/>
+        </FormField>
+        <FormField label="Status">
+          <Sel value={f.status} onChange={e=>set("status",e.target.value)} options={TRIP_STATUSES}/>
+        </FormField>
+      </div>
+
+      {/* Vehicle & Driver */}
+      <div style={{ ...C.formGrid, marginBottom:14 }}>
+        <FormField label="Type of Vehicle *">
+          <Inp value={f.vehicleType} onChange={e=>set("vehicleType",e.target.value)} placeholder="e.g. Ertiga, SUV, Bus"/>
+        </FormField>
+        <FormField label="Vehicle (Number Plate) *">
+          <Sel value={f.vehicleId} onChange={e=>{ set("vehicleId",e.target.value); const v=vehicles.find(x=>x.id===e.target.value); if(v) setF(p=>({...p,vehicleId:e.target.value,vehicleType:v.type})); }} options={[{value:"",label:"— Select —"},...vehicles.map(v=>({value:v.id,label:`${v.number} (${v.type})`}))]}/>
+        </FormField>
+        <FormField label="Driver's Name *">
+          <Sel value={f.driverId} onChange={e=>set("driverId",e.target.value)} options={[{value:"",label:"— Select —"},...drivers.map(d=>({value:d.id,label:d.name}))]}/>
+        </FormField>
+        <FormField label="Passenger Name *">
+          <Inp value={f.passengerName} onChange={e=>set("passengerName",e.target.value)} placeholder="Name / Designation"/>
+        </FormField>
+        <FormField label="From (Pickup) *">
+          <Inp value={f.pickup} onChange={e=>set("pickup",e.target.value)} placeholder="GITAM Campus"/>
+        </FormField>
+        <FormField label="To (Destination) *">
+          <Inp value={f.destination} onChange={e=>set("destination",e.target.value)} placeholder="Bengaluru"/>
+        </FormField>
+        <FormField label="Purpose of Travel">
+          <Inp value={f.purpose} onChange={e=>set("purpose",e.target.value)} placeholder="Official duty"/>
+        </FormField>
+        <FormField label="Requested By">
+          <Inp value={f.requestedBy} onChange={e=>set("requestedBy",e.target.value)}/>
+        </FormField>
+      </div>
+
+      {/* Trip log table — mirrors physical form */}
+      <div style={{ border:"1px solid #D1D5DB", borderRadius:8, overflow:"hidden", marginBottom:16 }}>
+        <div style={{ background:"#F1F5F9", padding:"8px 14px", fontSize:12, fontWeight:700, color:"#374151", borderBottom:"1px solid #D1D5DB" }}>TRIP LOG</div>
+        <div style={{ overflowX:"auto" }}>
+          <table style={{ width:"100%", borderCollapse:"collapse" }}>
+            <thead>
+              <tr style={{ background:"#F8FAFC" }}>
+                {["Date","Starting Time","Starting KMS","Closing Time","Closing KMS","Total KMS","Total Time","Remarks"].map(h => (
+                  <th key={h} style={{ ...C.th, whiteSpace:"nowrap" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style={{ ...C.td, minWidth:130 }}><Inp type="date" value={f.date} onChange={e=>set("date",e.target.value)} style={{ ...C.input, padding:"6px 8px", width:"100%" }}/></td>
+                <td style={{ ...C.td, minWidth:110 }}><Inp type="time" value={f.startTime} onChange={e=>set("startTime",e.target.value)} style={{ ...C.input, padding:"6px 8px", width:"100%" }}/></td>
+                <td style={{ ...C.td, minWidth:110 }}><Inp type="number" value={f.startKms} onChange={e=>handleKms("startKms",e.target.value)} placeholder="75763" style={{ ...C.input, padding:"6px 8px", width:"100%" }}/></td>
+                <td style={{ ...C.td, minWidth:110 }}><Inp type="time" value={f.closeTime} onChange={e=>set("closeTime",e.target.value)} style={{ ...C.input, padding:"6px 8px", width:"100%" }}/></td>
+                <td style={{ ...C.td, minWidth:110 }}><Inp type="number" value={f.closeKms} onChange={e=>handleKms("closeKms",e.target.value)} placeholder="75880" style={{ ...C.input, padding:"6px 8px", width:"100%" }}/></td>
+                <td style={{ ...C.td, minWidth:90, background:"#F0FDF4" }}><strong style={{ color:"#15803D" }}>{f.totalKms || "—"}</strong></td>
+                <td style={{ ...C.td, minWidth:110 }}><Inp value={f.totalTime} onChange={e=>set("totalTime",e.target.value)} placeholder="7.15 Hours" style={{ ...C.input, padding:"6px 8px", width:"100%" }}/></td>
+                <td style={{ ...C.td, minWidth:140 }}><Inp value={f.remarks} onChange={e=>set("remarks",e.target.value)} placeholder="Optional" style={{ ...C.input, padding:"6px 8px", width:"100%" }}/></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:20 }}>
+        <button style={C.btn("ghost")} onClick={onClose}>Cancel</button>
+        <button style={C.btn("primary")} onClick={() => { if(!f.date||!f.pickup||!f.destination||!f.passengerName) return alert("Date, passenger, pickup & destination required"); onSave(f); }}>Save Trip Sheet</button>
+      </div>
+    </div>
+  );
+}
+
+function Trips({ trips, setTrips, vehicles, drivers }) {
+  const [modal, setModal] = useState(null);
+  const [search, setSearch] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterDate, setFilterDate] = useState("");
+
+  const filtered = trips.filter(t => {
+    const q = search.toLowerCase();
+    return (!q || t.id.toLowerCase().includes(q) || t.pickup.toLowerCase().includes(q) || t.destination.toLowerCase().includes(q) || t.purpose.toLowerCase().includes(q))
+      && (!filterStatus || t.status === filterStatus)
+      && (!filterDate || t.date === filterDate);
+  }).sort((a,b) => b.date.localeCompare(a.date));
+
+  const save = (t) => {
+    setTrips(p => p.find(x=>x.id===t.id) ? p.map(x=>x.id===t.id?t:x) : [...p,t]);
+    setModal(null);
+  };
+  const del = (id) => { if (window.confirm("Delete trip?")) setTrips(p=>p.filter(x=>x.id!==id)); };
+  const getV = (id) => vehicles.find(v=>v.id===id);
+  const getD = (id) => drivers.find(d=>d.id===id);
+
+  const quickStatus = (trip, newStatus) => {
+    setTrips(p => p.map(x => x.id===trip.id ? {...x, status:newStatus} : x));
+  };
+
+  return (
+    <div>
+      <div style={C.tableWrap}>
+        <div style={C.tableHeader}>
+          <span style={C.tableTitle}>Trip Sheets ({filtered.length})</span>
+          <button style={C.btn("primary")} onClick={() => setModal({ mode:"add" })}><Icon n="plus" size={16} color="#fff"/> New Trip Sheet</button>
+        </div>
+        <div style={C.filterRow}>
+          <SearchBox value={search} onChange={setSearch} placeholder="Search trip ID, route, purpose…"/>
+          <select style={{ ...C.select, minWidth:160, width:"auto" }} value={filterStatus} onChange={e=>setFilterStatus(e.target.value)}>
+            <option value="">All Statuses</option>
+            {TRIP_STATUSES.map(s=><option key={s}>{s}</option>)}
+          </select>
+          <input type="date" style={{ ...C.input, minWidth:140 }} value={filterDate} onChange={e=>setFilterDate(e.target.value)}/>
+          {filterDate && <button style={{ ...C.iconBtn, fontSize:12, color:"#64748B" }} onClick={()=>setFilterDate("")}>Clear date</button>}
+        </div>
+        <div style={{ overflowX:"auto" }}>
+          <table style={C.table}>
+            <thead><tr>
+              {["Sheet No.","Date","Vehicle","Driver","Passenger","Route","Start KMS","Close KMS","Total KMS","Status","Actions"].map(h=><th key={h} style={C.th}>{h}</th>)}
+            </tr></thead>
+            <tbody>
+              {filtered.length===0 && <tr><td colSpan={11} style={{ ...C.td, textAlign:"center", color:"#94A3B8" }}>No trip sheets found</td></tr>}
+              {filtered.map(t => {
+                const v = getV(t.vehicleId);
+                const d = getD(t.driverId);
+                return (
+                  <tr key={t.id}>
+                    <td style={C.td}><span style={{ fontFamily:"monospace", fontSize:12, color:"#2E7CF6", fontWeight:700 }}>{t.sheetNo || t.id}</span></td>
+                    <td style={C.td}><span style={{ fontSize:12 }}>{fmtDate(t.date)}<br/><span style={{ color:"#64748B", fontSize:11 }}>{t.startTime} – {t.closeTime}</span></span></td>
+                    <td style={C.td}><span style={{ fontSize:12 }}>{t.vehicleType}<br/><span style={{ color:"#2E7CF6", fontSize:11, fontWeight:500 }}>{v ? v.number : "—"}</span></span></td>
+                    <td style={C.td}><span style={{ fontSize:12 }}>{d ? d.name : <span style={{ color:"#94A3B8" }}>—</span>}</span></td>
+                    <td style={C.td}><span style={{ fontSize:12 }}>{t.passengerName || "—"}</span></td>
+                    <td style={C.td}><span style={{ fontSize:12 }}>{t.pickup}<br/>→ {t.destination}</span></td>
+                    <td style={C.td}>{t.startKms || "—"}</td>
+                    <td style={C.td}>{t.closeKms || "—"}</td>
+                    <td style={C.td}><strong style={{ color:"#15803D" }}>{t.totalKms || "—"}</strong></td>
+                    <td style={C.td}><Badge status={t.status}/></td>
+                    <td style={C.td}>
+                      <div style={C.row}>
+                        {t.status === "Requested" && <button style={{ ...C.btn("success"), padding:"4px 10px", fontSize:11 }} onClick={() => quickStatus(t,"Approved")}><Icon n="check" size={12} color="#fff"/>Approve</button>}
+                        {t.status === "Approved" && <button style={{ ...C.btn("primary"), padding:"4px 10px", fontSize:11 }} onClick={() => quickStatus(t,"Trip Started")}>Start</button>}
+                        {t.status === "Trip Started" && <button style={{ ...C.btn("ghost"), padding:"4px 10px", fontSize:11 }} onClick={() => quickStatus(t,"Trip Completed")}>End</button>}
+                        <button style={C.iconBtn} onClick={() => setModal({ mode:"edit", trip:t })}><Icon n="edit" size={15} color="#2E7CF6"/></button>
+                        <button style={C.iconBtn} onClick={() => del(t.id)}><Icon n="trash" size={15} color="#EF4444"/></button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {modal && (
+        <Modal title={modal.mode==="add"?"New Trip Sheet":"Edit Trip Sheet"} onClose={() => setModal(null)} wide>
+          <TripForm trip={modal.trip} vehicles={vehicles} drivers={drivers} onSave={save} onClose={() => setModal(null)}/>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ─── Reports ───────────────────────────────────────────────────────────────────
+function Reports({ trips, vehicles, drivers }) {
+  const [type, setType] = useState("trips");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+
+  const inRange = (date) => (!from || date >= from) && (!to || date <= to);
+
+  const filtered = trips.filter(t => inRange(t.date));
+
+  const tripByStatus = TRIP_STATUSES.map(s => ({ status:s, count:filtered.filter(t=>t.status===s).length })).filter(x=>x.count>0);
+
+  const vehicleUtil = vehicles.map(v => ({
+    number:v.number, type:v.type,
+    trips:filtered.filter(t=>t.vehicleId===v.id).length,
+    status:v.status
+  }));
+
+  const driverUtil = drivers.map(d => ({
+    name:d.name, empId:d.empId,
+    trips:filtered.filter(t=>t.driverId===d.id).length,
+    status:d.status
+  }));
+
+  const expiryReport = [];
+  vehicles.forEach(v => {
+    [["insuranceExpiry","Insurance"],["pucExpiry","PUC"],["fitnessExpiry","Fitness"],["roadTaxExpiry","Road Tax"],["permitExpiry","Permit"]].forEach(([k,label]) => {
+      if (v[k]) expiryReport.push({ vehicle:v.number, doc:label, expiry:v[k], status:expiryStatus(v[k]), days:daysUntil(v[k]) });
+    });
+  });
+
+  return (
+    <div>
+      <div style={{ ...C.tableWrap, marginBottom:16 }}>
+        <div style={C.tableHeader}>
+          <span style={C.tableTitle}>Reports</span>
+          <button style={C.btn("ghost")} onClick={() => alert("Export functionality — in production this generates CSV/PDF")}><Icon n="download" size={16} color="#2E7CF6"/> Export</button>
+        </div>
+        <div style={C.filterRow}>
+          <div style={{ display:"flex", gap:6 }}>
+            {[["trips","Trip Summary"],["vehicles","Vehicle Utilisation"],["drivers","Driver Utilisation"],["expiry","Document Expiry"]].map(([k,l]) => (
+              <button key={k} onClick={() => setType(k)} style={{ padding:"6px 14px", borderRadius:6, border:"1px solid", borderColor:type===k?"#2E7CF6":"#D1D5DB", background:type===k?"#2E7CF6":"#fff", color:type===k?"#fff":"#374151", fontSize:13, fontWeight:500, cursor:"pointer" }}>{l}</button>
+            ))}
+          </div>
+          <div style={{ marginLeft:"auto", display:"flex", gap:8, alignItems:"center" }}>
+            <span style={{ fontSize:12, color:"#64748B" }}>From:</span>
+            <input type="date" style={{ ...C.input, padding:"6px 10px" }} value={from} onChange={e=>setFrom(e.target.value)}/>
+            <span style={{ fontSize:12, color:"#64748B" }}>To:</span>
+            <input type="date" style={{ ...C.input, padding:"6px 10px" }} value={to} onChange={e=>setTo(e.target.value)}/>
+          </div>
+        </div>
+      </div>
+
+      {type === "trips" && (
+        <div style={C.tableWrap}>
+          <div style={{ padding:"12px 20px", borderBottom:"1px solid #E2E8F0" }}>
+            <div style={{ display:"flex", gap:12, flexWrap:"wrap" }}>
+              {tripByStatus.map(x => <div key={x.status} style={{ ...C.statCard(statusColor(x.status)), padding:"12px 18px", minWidth:120 }}><div style={C.statNum}>{x.count}</div><div style={C.statLabel}>{x.status}</div></div>)}
+            </div>
+          </div>
+          <table style={C.table}>
+            <thead><tr>{["Sheet No.","Date","Vehicle","Driver","Passenger","Route","Total KMS","Status"].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead>
+            <tbody>
+              {filtered.length===0 && <tr><td colSpan={8} style={{ ...C.td, textAlign:"center", color:"#94A3B8" }}>No trip sheets in selected range</td></tr>}
+              {filtered.map(t => (
+                <tr key={t.id}>
+                  <td style={C.td}><span style={{ fontFamily:"monospace", fontSize:12, color:"#2E7CF6", fontWeight:700 }}>{t.sheetNo || t.id}</span></td>
+                  <td style={C.td}>{fmtDate(t.date)}</td>
+                  <td style={C.td}>{vehicles.find(v=>v.id===t.vehicleId)?.number || "—"}</td>
+                  <td style={C.td}>{drivers.find(d=>d.id===t.driverId)?.name || "—"}</td>
+                  <td style={C.td}>{t.passengerName || "—"}</td>
+                  <td style={C.td}><span style={{ fontSize:12 }}>{t.pickup} → {t.destination}</span></td>
+                  <td style={C.td}><strong style={{ color:"#15803D" }}>{t.totalKms || "—"}</strong></td>
+                  <td style={C.td}><Badge status={t.status}/></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {type === "vehicles" && (
+        <div style={C.tableWrap}>
+          <table style={C.table}>
+            <thead><tr>{["Vehicle No.","Type","Status","Trips Completed"].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead>
+            <tbody>
+              {vehicleUtil.map(v => (
+                <tr key={v.number}>
+                  <td style={C.td}><strong>{v.number}</strong></td>
+                  <td style={C.td}>{v.type}</td>
+                  <td style={C.td}><Badge status={v.status}/></td>
+                  <td style={C.td}><strong style={{ color:"#2E7CF6" }}>{v.trips}</strong></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {type === "drivers" && (
+        <div style={C.tableWrap}>
+          <table style={C.table}>
+            <thead><tr>{["Emp ID","Name","Status","Trips Handled"].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead>
+            <tbody>
+              {driverUtil.map(d => (
+                <tr key={d.empId}>
+                  <td style={C.td}><span style={{ fontFamily:"monospace", color:"#2E7CF6" }}>{d.empId}</span></td>
+                  <td style={C.td}><strong>{d.name}</strong></td>
+                  <td style={C.td}><Badge status={d.status}/></td>
+                  <td style={C.td}><strong style={{ color:"#2E7CF6" }}>{d.trips}</strong></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {type === "expiry" && (
+        <div style={C.tableWrap}>
+          <table style={C.table}>
+            <thead><tr>{["Vehicle","Document","Expiry Date","Days Left","Status"].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead>
+            <tbody>
+              {expiryReport.sort((a,b)=>a.days-b.days).map((r,i) => (
+                <tr key={i} style={{ background:r.status==="Expired"?"#FEF2F2":r.status==="Expiring Soon"?"#FFFBEB":"" }}>
+                  <td style={C.td}><strong>{r.vehicle}</strong></td>
+                  <td style={C.td}>{r.doc}</td>
+                  <td style={C.td}>{fmtDate(r.expiry)}</td>
+                  <td style={C.td}><span style={{ fontWeight:700, color:r.days<0?"#EF4444":r.days<=30?"#F59E0B":"#10B981" }}>{r.days < 0 ? `${Math.abs(r.days)} days ago` : `${r.days} days`}</span></td>
+                  <td style={C.td}><Badge status={r.status}/></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Driver Documents View (read-only, mirrors Admin Documents tab) ────────────
+function DriverDocumentsView({ docs, vehicles, assignedVehicleId }) {
+  const [search, setSearch] = useState("");
+  const [filterType, setFilterType] = useState("");
+  const [viewDoc, setViewDoc] = useState(null);
+
+  const ALL_DOC_TYPES_ORDERED = ["Registration Certificate","Insurance","PUC","Fitness","Road Tax","Vehicle Permit","Driver License","Trip Sheet Scan","Other"];
+
+  // Only show docs for the driver's assigned vehicle
+  const vehicleDocs = docs.filter(d => assignedVehicleId ? d.vehicleId === assignedVehicleId : false);
+  const assignedVehicle = vehicles.find(v => v.id === assignedVehicleId);
+
+  const filtered = vehicleDocs.filter(d => {
+    const q = search.toLowerCase();
+    return (!q || d.name.toLowerCase().includes(q))
+      && (!filterType || d.type === filterType);
+  });
+
+  const getVehicle = (vid) => vehicles.find(v => v.id === vid);
+
+  if (!assignedVehicleId) {
+    return (
+      <div style={{ ...C.tableWrap, padding:40, textAlign:"center" }}>
+        <Icon n="doc" size={36} color="#CBD5E1"/>
+        <div style={{ marginTop:12, color:"#94A3B8", fontSize:14 }}>No vehicle assigned to you yet. Documents will appear here once a vehicle is assigned.</div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ background:"#EFF6FF", border:"1px solid #BFDBFE", borderRadius:10, padding:"12px 16px", marginBottom:16, display:"flex", alignItems:"center", gap:10 }}>
+        <Icon n="vehicle" size={16} color="#2E7CF6"/>
+        <div style={{ fontSize:13, color:"#1D4ED8" }}>
+          Documents for your assigned vehicle: <strong>{assignedVehicle?.number} — {assignedVehicle?.make} {assignedVehicle?.model}</strong>
+        </div>
+      </div>
+      <div style={C.tableWrap}>
+        <div style={C.tableHeader}>
+          <span style={C.tableTitle}>Vehicle Documents ({filtered.length})</span>
+          <span style={{ fontSize:12, color:"#64748B", background:"#F1F5F9", padding:"4px 10px", borderRadius:6, fontWeight:600 }}>View Only</span>
+        </div>
+        <div style={C.filterRow}>
+          <SearchBox value={search} onChange={setSearch} placeholder="Search document name…"/>
+          <select style={{ ...C.select, minWidth:160, width:"auto" }} value={filterType} onChange={e=>setFilterType(e.target.value)}>
+            <option value="">All Types</option>
+            {ALL_DOC_TYPES_ORDERED.map(t=><option key={t}>{t}</option>)}
+          </select>
+        </div>
+        <div style={{ overflowX:"auto" }}>
+          <table style={C.table}>
+            <thead><tr>
+              {["Vehicle","Document Name","Type","Upload Date","Expiry","Status","Scan"].map(h=><th key={h} style={C.th}>{h}</th>)}
+            </tr></thead>
+            <tbody>
+              {filtered.length===0 && <tr><td colSpan={7} style={{ ...C.td, textAlign:"center", color:"#94A3B8" }}>No documents found</td></tr>}
+              {filtered.map(d => {
+                const v = getVehicle(d.vehicleId);
+                const s = d.expiryDate ? expiryStatus(d.expiryDate) : "Valid";
+                return (
+                  <tr key={d.id}>
+                    <td style={C.td}>{v ? <span style={{ fontWeight:600, color:"#2E7CF6" }}>{v.number}</span> : "—"}</td>
+                    <td style={C.td}><div style={{ display:"flex", alignItems:"center", gap:8 }}><Icon n="doc" size={15} color="#64748B"/>{d.name}</div></td>
+                    <td style={C.td}><span style={C.chip("#64748B")}>{d.type}</span></td>
+                    <td style={C.td}>{fmtDate(d.uploadDate)}</td>
+                    <td style={C.td}>{d.expiryDate ? <span style={C.chip(statusColor(s))}>{fmtDate(d.expiryDate)}</span> : <span style={{ color:"#94A3B8" }}>N/A</span>}</td>
+                    <td style={C.td}><Badge status={s}/></td>
+                    <td style={C.td}>
+                      {d.fileData
+                        ? <button style={{ ...C.iconBtn, background:"#EFF6FF", borderRadius:5, padding:"4px 10px", fontSize:12, color:"#2E7CF6", fontWeight:600 }} onClick={() => setViewDoc(d)}><Icon n="eye" size={14} color="#2E7CF6"/> View</button>
+                        : <span style={{ fontSize:11, color:"#F59E0B", fontWeight:600 }}>Not uploaded</span>}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {viewDoc && <DocViewerModal doc={viewDoc} onClose={() => setViewDoc(null)}/>}
+    </div>
+  );
+}
+
+// ─── Driver Trip Sheet ─────────────────────────────────────────────────────────
+function DriverTripSheet({ driver, vehicle, trips, setTrips }) {
+  const actionable = trips.filter(t => ["Approved","Vehicle Assigned","Driver Assigned","Trip Started","Trip Completed"].includes(t.status));
+  const [selected, setSelected] = useState(actionable[0]?.id || null);
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState({});
+  const [saved, setSaved] = useState(false);
+
+  const trip = trips.find(t => t.id === selected);
+
+  const openEdit = (t) => {
+    setForm({
+      startTime: t.startTime || "",
+      startKms: t.startKms || "",
+      closeTime: t.closeTime || "",
+      closeKms: t.closeKms || "",
+      totalTime: t.totalTime || "",
+      remarks: t.remarks || "",
+    });
+    setEditing(true);
+    setSaved(false);
+  };
+
+  const computeKms = (f) => {
+    const s = Number(f.startKms), c = Number(f.closeKms);
+    return (s && c && c >= s) ? c - s : null;
+  };
+
+  const save = () => {
+    const totalKms = computeKms(form);
+    let newStatus = trip.status;
+    if (trip.status === "Approved" || trip.status === "Vehicle Assigned" || trip.status === "Driver Assigned") {
+      if (form.startKms && form.startTime) newStatus = "Trip Started";
+    }
+    if (trip.status === "Trip Started" && form.closeKms && form.closeTime) {
+      newStatus = "Trip Completed";
+    }
+    setTrips(p => p.map(t => t.id === selected
+      ? { ...t, ...form, totalKms: totalKms ?? t.totalKms, status: newStatus }
+      : t
+    ));
+    setEditing(false);
+    setSaved(true);
+  };
+
+  const fSet = (k, v) => setForm(p => ({ ...p, [k]: v }));
+
+  if (actionable.length === 0) {
+    return (
+      <div style={{ ...C.tableWrap, padding:40, textAlign:"center" }}>
+        <Icon n="trip" size={36} color="#CBD5E1"/>
+        <div style={{ marginTop:12, color:"#94A3B8", fontSize:14 }}>No active or upcoming trips assigned to you.</div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {/* Trip selector */}
+      <div style={{ display:"flex", gap:10, marginBottom:16, flexWrap:"wrap" }}>
+        {actionable.map(t => (
+          <button key={t.id}
+            style={{ padding:"8px 14px", borderRadius:8, border:"2px solid", fontSize:13, fontWeight:600, cursor:"pointer",
+              borderColor: selected===t.id ? "#2E7CF6" : "#E2E8F0",
+              background: selected===t.id ? "#EFF6FF" : "#fff",
+              color: selected===t.id ? "#2E7CF6" : "#374151" }}
+            onClick={() => { setSelected(t.id); setEditing(false); setSaved(false); }}
+          >
+            #{t.sheetNo || t.id} · {t.destination}
+          </button>
+        ))}
+      </div>
+
+      {trip && (
+        <div style={{ background:"#fff", borderRadius:12, boxShadow:"0 1px 4px rgba(0,0,0,.06)", overflow:"hidden" }}>
+          {/* Trip header */}
+          <div style={{ background:"#0F1C2E", padding:"16px 24px", display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:10 }}>
+            <div>
+              <div style={{ color:"#fff", fontWeight:700, fontSize:16 }}>Trip Sheet #{trip.sheetNo || trip.id}</div>
+              <div style={{ color:"#94A3B8", fontSize:12, marginTop:2 }}>{fmtDate(trip.date)} · {trip.purpose || "Official Travel"}</div>
+            </div>
+            <Badge status={trip.status}/>
+          </div>
+
+          {/* Trip info grid */}
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))", gap:0, borderBottom:"1px solid #E2E8F0" }}>
+            {[
+              ["Passenger", trip.passengerName || "—"],
+              ["From", trip.pickup],
+              ["To", trip.destination],
+              ["Vehicle", vehicle ? `${vehicle.number} (${vehicle.type})` : trip.vehicleType || "—"],
+            ].map(([label, val]) => (
+              <div key={label} style={{ padding:"14px 20px", borderRight:"1px solid #F1F5F9" }}>
+                <div style={{ fontSize:11, color:"#64748B", marginBottom:3 }}>{label}</div>
+                <div style={{ fontSize:13, fontWeight:600, color:"#0F1C2E" }}>{val}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Trip log section */}
+          <div style={{ padding:"20px 24px" }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+              <div style={{ fontSize:14, fontWeight:700, color:"#0F1C2E" }}>Trip Log</div>
+              {!editing && (
+                <button style={C.btn("primary")} onClick={() => openEdit(trip)}>
+                  <Icon n="edit" size={14} color="#fff"/> {trip.startKms ? "Update Details" : "Fill Trip Details"}
+                </button>
+              )}
+            </div>
+
+            {saved && !editing && (
+              <div style={{ ...C.alertBar("info"), marginBottom:12 }}>
+                <Icon n="check" size={15} color="#2E7CF6"/>
+                <div style={C.alertText}>Trip details saved successfully.</div>
+              </div>
+            )}
+
+            {!editing ? (
+              /* Read-only view */
+              <div style={{ overflowX:"auto" }}>
+                <table style={{ ...C.table, border:"1px solid #E2E8F0", borderRadius:8 }}>
+                  <thead>
+                    <tr style={{ background:"#F8FAFC" }}>
+                      {["Start Time","Start KMS","Close Time","Close KMS","Total KMS","Total Time","Remarks"].map(h => (
+                        <th key={h} style={{ ...C.th, whiteSpace:"nowrap" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td style={C.td}>{trip.startTime || <span style={{ color:"#CBD5E1" }}>—</span>}</td>
+                      <td style={C.td}>{trip.startKms || <span style={{ color:"#CBD5E1" }}>—</span>}</td>
+                      <td style={C.td}>{trip.closeTime || <span style={{ color:"#CBD5E1" }}>—</span>}</td>
+                      <td style={C.td}>{trip.closeKms || <span style={{ color:"#CBD5E1" }}>—</span>}</td>
+                      <td style={{ ...C.td, background:"#F0FDF4" }}>
+                        {trip.totalKms ? <strong style={{ color:"#15803D" }}>{trip.totalKms} km</strong> : <span style={{ color:"#CBD5E1" }}>—</span>}
+                      </td>
+                      <td style={C.td}>{trip.totalTime || <span style={{ color:"#CBD5E1" }}>—</span>}</td>
+                      <td style={C.td}>{trip.remarks || <span style={{ color:"#CBD5E1" }}>—</span>}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              /* Edit form */
+              <div>
+                <div style={{ background:"#FFF7ED", border:"1px solid #FED7AA", borderRadius:8, padding:"10px 14px", marginBottom:16, fontSize:12, color:"#92400E" }}>
+                  <strong>Instructions:</strong> Fill in the trip details below. Entering start details will mark the trip as Started; entering close details will mark it Completed.
+                </div>
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:14, marginBottom:14 }}>
+                  <FormField label="Start Time">
+                    <Inp type="time" value={form.startTime} onChange={e => fSet("startTime", e.target.value)}/>
+                  </FormField>
+                  <FormField label="Start KMS *">
+                    <Inp type="number" value={form.startKms} onChange={e => fSet("startKms", e.target.value)} placeholder="e.g. 75763"/>
+                  </FormField>
+                  <div/>
+                  <FormField label="Close Time">
+                    <Inp type="time" value={form.closeTime} onChange={e => fSet("closeTime", e.target.value)}/>
+                  </FormField>
+                  <FormField label="Close KMS">
+                    <Inp type="number" value={form.closeKms} onChange={e => fSet("closeKms", e.target.value)} placeholder="e.g. 75880"/>
+                  </FormField>
+                  <FormField label="Total KMS">
+                    <div style={{ padding:"9px 12px", background:"#F0FDF4", border:"1px solid #D1FAE5", borderRadius:7, fontSize:13, fontWeight:700, color:"#15803D" }}>
+                      {computeKms(form) !== null ? `${computeKms(form)} km` : "Auto-calculated"}
+                    </div>
+                  </FormField>
+                  <FormField label="Total Time">
+                    <Inp value={form.totalTime} onChange={e => fSet("totalTime", e.target.value)} placeholder="e.g. 7.15 Hours"/>
+                  </FormField>
+                  <FormField label="Remarks" >
+                    <Inp value={form.remarks} onChange={e => fSet("remarks", e.target.value)} placeholder="Optional notes"/>
+                  </FormField>
+                </div>
+                <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
+                  <button style={C.btn("ghost")} onClick={() => setEditing(false)}>Cancel</button>
+                  <button style={C.btn("primary")} onClick={save}>
+                    <Icon n="check" size={14} color="#fff"/> Save Trip Sheet
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Driver Trip Sheet Form ────────────────────────────────────────────────────
+function DriverTripSheetForm({ driver, vehicle, trips, setTrips, docs, setDocs }) {
+  const [selectedTripId, setSelectedTripId] = useState(trips[0]?.id || null);
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState({});
+  const [saved, setSaved] = useState(false);
+  const [scanUploading, setScanUploading] = useState(false);
+  const [scanFile, setScanFile] = useState({ fileData:"", fileName:"" });
+  const [viewScan, setViewScan] = useState(null);
+  const [showNewForm, setShowNewForm] = useState(false);
+  const [newForm, setNewForm] = useState({ sheetNo:"", passengerName:"", pickup:"GITAM", destination:"", date: today(), startTime:"", startKms:"", closeTime:"", closeKms:"", totalTime:"", remarks:"", purpose:"Official Travel" });
+  const nSet = (k,v) => setNewForm(p => ({...p,[k]:v}));
+  const computeNewKms = () => { const s=Number(newForm.startKms),c=Number(newForm.closeKms); return (s&&c&&c>=s)?c-s:null; };
+
+  const submitNewTrip = () => {
+    if (!newForm.passengerName.trim()) { alert("Passenger name is required"); return; }
+    if (!newForm.destination.trim()) { alert("Destination is required"); return; }
+    if (!newForm.startKms) { alert("Starting KMS is required"); return; }
+    const totalKms = computeNewKms();
+    let status = "Trip Started";
+    if (newForm.closeKms && newForm.closeTime) status = "Trip Completed";
+    const newTrip = {
+      id: "T" + uid(),
+      sheetNo: newForm.sheetNo || String(Date.now()).slice(-4),
+      vehicleType: vehicle?.type || "",
+      vehicleId: vehicle?.id || "",
+      driverId: driver.id,
+      passengerName: newForm.passengerName,
+      pickup: newForm.pickup,
+      destination: newForm.destination,
+      purpose: newForm.purpose,
+      date: newForm.date,
+      startTime: newForm.startTime,
+      startKms: Number(newForm.startKms),
+      closeTime: newForm.closeTime,
+      closeKms: newForm.closeKms ? Number(newForm.closeKms) : "",
+      totalKms: totalKms ?? "",
+      totalTime: newForm.totalTime,
+      remarks: newForm.remarks,
+      status,
+      requestedBy: driver.name,
+      createdAt: today(),
+    };
+    setTrips(p => [...p, newTrip]);
+    setSelectedTripId(newTrip.id);
+    setShowNewForm(false);
+    setNewForm({ sheetNo:"", passengerName:"", pickup:"GITAM", destination:"", date:today(), startTime:"", startKms:"", closeTime:"", closeKms:"", totalTime:"", remarks:"", purpose:"Official Travel" });
+    setSaved(true);
+  };
+
+  const trip = trips.find(t => t.id === selectedTripId);
+  const existingScan = trip ? docs.find(d => d.tripId === trip.id && d.type === "Trip Sheet Scan") : null;
+
+  const openEdit = (t) => {
+    setForm({
+      sheetNo: t.sheetNo || "",
+      vehicleType: t.vehicleType || (vehicle ? vehicle.type : ""),
+      vehicleNumber: vehicle ? vehicle.number : "",
+      passengerName: t.passengerName || "",
+      pickup: t.pickup || "",
+      destination: t.destination || "",
+      date: t.date || today(),
+      startTime: t.startTime || "",
+      startKms: t.startKms || "",
+      closeTime: t.closeTime || "",
+      closeKms: t.closeKms || "",
+      totalTime: t.totalTime || "",
+      remarks: t.remarks || "",
+    });
+    setEditing(true);
+    setSaved(false);
+  };
+
+  const computeKms = () => {
+    const s = Number(form.startKms), c = Number(form.closeKms);
+    return (s && c && c >= s) ? c - s : null;
+  };
+
+  const fSet = (k, v) => setForm(p => ({ ...p, [k]: v }));
+
+  const save = () => {
+    const totalKms = computeKms();
+    let newStatus = trip.status;
+    if (["Approved","Vehicle Assigned","Driver Assigned"].includes(trip.status)) {
+      if (form.startKms && form.startTime) newStatus = "Trip Started";
+    }
+    if (trip.status === "Trip Started" && form.closeKms && form.closeTime) newStatus = "Trip Completed";
+    setTrips(p => p.map(t => t.id === selectedTripId
+      ? { ...t, ...form, totalKms: totalKms ?? t.totalKms, status: newStatus }
+      : t
+    ));
+    setEditing(false);
+    setSaved(true);
+  };
+
+  const handleScanUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setScanUploading(true);
+    const reader = new FileReader();
+    reader.onload = ev => { setScanFile({ fileData: ev.target.result, fileName: file.name }); setScanUploading(false); };
+    reader.readAsDataURL(file);
+  };
+
+  const saveScan = () => {
+    if (!scanFile.fileData || !trip) return;
+    const newDoc = {
+      id: existingScan ? existingScan.id : "DOC" + uid(),
+      vehicleId: vehicle?.id || "",
+      tripId: trip.id,
+      name: `Trip Sheet #${trip.sheetNo || trip.id}`,
+      type: "Trip Sheet Scan",
+      uploadDate: today(),
+      expiryDate: "",
+      status: "Valid",
+      fileName: scanFile.fileName,
+      fileData: scanFile.fileData,
+      uploadedBy: driver.name,
+    };
+    setDocs(p => existingScan ? p.map(d => d.id===existingScan.id ? newDoc : d) : [...p, newDoc]);
+    setScanFile({ fileData:"", fileName:"" });
+    alert("Scan uploaded successfully! Admin can now view it.");
+  };
+
+  // GITAM form style
+  const TS = {
+    wrap: { background:"#fff", borderRadius:12, boxShadow:"0 1px 8px rgba(0,0,0,.08)", overflow:"hidden", marginBottom:20 },
+    formWrap: { background:"#fff", border:"2px solid #1A2C42", borderRadius:8, margin:20, overflow:"hidden" },
+    header: { display:"flex", alignItems:"center", padding:"10px 16px", borderBottom:"2px solid #1A2C42", background:"#fff", gap:16 },
+    logoBox: { display:"flex", alignItems:"center", gap:10 },
+    logoText: { fontSize:11, fontWeight:800, color:"#1A2C42", lineHeight:1.2 },
+    sheetTitle: { flex:1, textAlign:"center" },
+    sheetNo: { background:"#fff", border:"1px solid #1A2C42", padding:"6px 14px", fontSize:13, borderRadius:4 },
+    row: { display:"grid", gridTemplateColumns:"160px 1fr", borderBottom:"1px solid #CBD5E1" },
+    rowLabel: { padding:"9px 12px", fontSize:12, fontWeight:700, color:"#1A2C42", background:"#F8FAFC", borderRight:"1px solid #CBD5E1" },
+    rowVal: { padding:"9px 12px", fontSize:13, color:"#0F1C2E", fontWeight:600 },
+    rowInp: { padding:"7px 10px", border:"none", outline:"none", fontSize:13, width:"100%", background:"transparent", fontWeight:600 },
+    tableHead: { display:"grid", gridTemplateColumns:"90px 90px 90px 90px 90px 90px 90px 1fr", background:"#0F1C2E" },
+    tableRow: { display:"grid", gridTemplateColumns:"90px 90px 90px 90px 90px 90px 90px 1fr", borderBottom:"1px solid #CBD5E1" },
+    th: { padding:"8px 6px", fontSize:10, fontWeight:700, color:"#fff", textAlign:"center", borderRight:"1px solid #1F3048" },
+    td: { padding:"8px 6px", fontSize:12, textAlign:"center", borderRight:"1px solid #E2E8F0", color:"#0F1C2E", fontWeight:600 },
+    tdInp: { padding:"6px 4px", border:"none", outline:"none", fontSize:12, width:"100%", textAlign:"center", background:"transparent", fontWeight:600 },
+    sigRow: { display:"grid", gridTemplateColumns:"1fr 1fr", borderTop:"2px solid #1A2C42" },
+    sigCell: { padding:"12px 16px" },
+  };
+
+  return (
+    <div>
+      {/* New Trip Sheet button */}
+      <div style={{ display:"flex", justifyContent:"flex-end", marginBottom:12 }}>
+        <button style={C.btn("primary")} onClick={() => { setShowNewForm(s=>!s); setEditing(false); }}>
+          <Icon n="plus" size={15} color="#fff"/> {showNewForm ? "Cancel" : "New Trip Sheet"}
+        </button>
+      </div>
+
+      {/* New Trip Sheet Form */}
+      {showNewForm && (
+        <div style={{ background:"#fff", borderRadius:12, boxShadow:"0 1px 8px rgba(0,0,0,.08)", padding:"20px 24px", marginBottom:20 }}>
+          <div style={{ fontSize:15, fontWeight:700, color:"#0F1C2E", marginBottom:16, borderBottom:"1px solid #E2E8F0", paddingBottom:10 }}>
+            Create New Trip Sheet
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:14, marginBottom:14 }}>
+            <FormField label="Sheet No. (optional)"><Inp value={newForm.sheetNo} onChange={e=>nSet("sheetNo",e.target.value)} placeholder="e.g. 632"/></FormField>
+            <FormField label="Passenger Name *"><Inp value={newForm.passengerName} onChange={e=>nSet("passengerName",e.target.value)} placeholder="Passenger(s)"/></FormField>
+            <FormField label="Purpose"><Inp value={newForm.purpose} onChange={e=>nSet("purpose",e.target.value)}/></FormField>
+            <FormField label="Pickup / From"><Inp value={newForm.pickup} onChange={e=>nSet("pickup",e.target.value)}/></FormField>
+            <FormField label="Destination *"><Inp value={newForm.destination} onChange={e=>nSet("destination",e.target.value)} placeholder="e.g. Bengaluru"/></FormField>
+            <FormField label="Date"><Inp type="date" value={newForm.date} onChange={e=>nSet("date",e.target.value)}/></FormField>
+            <FormField label="Start Time"><Inp type="time" value={newForm.startTime} onChange={e=>nSet("startTime",e.target.value)}/></FormField>
+            <FormField label="Starting KMS *"><Inp type="number" value={newForm.startKms} onChange={e=>nSet("startKms",e.target.value)} placeholder="e.g. 75763"/></FormField>
+            <div/>
+            <FormField label="Close Time"><Inp type="time" value={newForm.closeTime} onChange={e=>nSet("closeTime",e.target.value)}/></FormField>
+            <FormField label="Closing KMS"><Inp type="number" value={newForm.closeKms} onChange={e=>nSet("closeKms",e.target.value)} placeholder="e.g. 75880"/></FormField>
+            <FormField label="Total KMS">
+              <div style={{ padding:"9px 12px", background:"#F0FDF4", border:"1px solid #D1FAE5", borderRadius:7, fontSize:13, fontWeight:700, color:"#15803D" }}>
+                {computeNewKms() !== null ? `${computeNewKms()} km` : "Auto-calculated"}
+              </div>
+            </FormField>
+            <FormField label="Total Time"><Inp value={newForm.totalTime} onChange={e=>nSet("totalTime",e.target.value)} placeholder="e.g. 7.15 Hours"/></FormField>
+            <FormField label="Remarks"><Inp value={newForm.remarks} onChange={e=>nSet("remarks",e.target.value)} placeholder="Optional"/></FormField>
+          </div>
+          <div style={{ background:"#F8FAFC", borderRadius:8, padding:"10px 14px", fontSize:12, color:"#64748B", marginBottom:14 }}>
+            Vehicle: <strong style={{ color:"#0F1C2E" }}>{vehicle ? `${vehicle.number} — ${vehicle.make} ${vehicle.model}` : "No vehicle assigned"}</strong> &nbsp;·&nbsp; Driver: <strong style={{ color:"#0F1C2E" }}>{driver.name}</strong>
+          </div>
+          <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
+            <button style={C.btn("ghost")} onClick={() => setShowNewForm(false)}>Cancel</button>
+            <button style={C.btn("success")} onClick={submitNewTrip}><Icon n="check" size={14} color="#fff"/> Save Trip Sheet</button>
+          </div>
+        </div>
+      )}
+
+      {/* Trip Selector */}
+      {trips.length > 0 ? (
+        <>
+          <div style={{ display:"flex", gap:10, marginBottom:16, flexWrap:"wrap", alignItems:"center" }}>
+            <span style={{ fontSize:13, fontWeight:600, color:"#64748B" }}>Select Trip Sheet:</span>
+            {trips.map(t => (
+              <button key={t.id}
+                style={{ padding:"7px 14px", borderRadius:8, border:"2px solid", fontSize:13, fontWeight:600, cursor:"pointer",
+                  borderColor: selectedTripId===t.id ? "#2E7CF6" : "#E2E8F0",
+                  background: selectedTripId===t.id ? "#EFF6FF" : "#fff",
+                  color: selectedTripId===t.id ? "#2E7CF6" : "#374151" }}
+                onClick={() => { setSelectedTripId(t.id); setEditing(false); setSaved(false); setScanFile({fileData:"",fileName:""}); }}
+              >
+                #{t.sheetNo || t.id} · {t.destination}
+              </button>
+            ))}
+          </div>
+
+          {trip && (
+            <div style={TS.wrap}>
+              {/* GITAM Trip Sheet Header */}
+              <div style={{ background:"#0F1C2E", padding:"12px 20px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <span style={{ color:"#fff", fontWeight:700, fontSize:15 }}>Trip Sheet #{trip.sheetNo || trip.id}</span>
+                <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                  <Badge status={trip.status}/>
+                  {!editing && <button style={C.btn("primary")} onClick={() => openEdit(trip)}><Icon n="edit" size={14} color="#fff"/>{trip.startKms ? "Edit Details" : "Fill Sheet"}</button>}
+                  {editing && <button style={C.btn("ghost")} onClick={() => setEditing(false)}>Cancel</button>}
+                  {editing && <button style={C.btn("success")} onClick={save}><Icon n="check" size={14} color="#fff"/>Save</button>}
+                </div>
+              </div>
+
+              {saved && <div style={{ ...C.alertBar("info"), margin:"12px 20px 0" }}><Icon n="check" size={15} color="#2E7CF6"/><div style={C.alertText}>Trip sheet saved successfully.</div></div>}
+
+              {/* Physical-form style layout */}
+              <div style={TS.formWrap}>
+                {/* GITAM Header */}
+                <div style={TS.header}>
+                  <div style={TS.logoBox}>
+                    <div style={{ width:44, height:44, background:"#0F1C2E", borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                      <Icon n="vehicle" size={24} color="#2E7CF6"/>
+                    </div>
+                    <div style={TS.logoText}>
+                      <div style={{ fontSize:14, fontWeight:800 }}>GITAM</div>
+                      <div style={{ fontSize:9, fontWeight:600, color:"#64748B" }}>DEEMED TO BE UNIVERSITY</div>
+                    </div>
+                  </div>
+                  <div style={TS.sheetTitle}>
+                    <div style={{ fontSize:11, color:"#64748B" }}>GANDHI INSTITUTE OF TECHNOLOGY AND MANAGEMENT (GITAM)</div>
+                    <div style={{ fontSize:16, fontWeight:800, color:"#0F1C2E", marginTop:2 }}>TRIP SHEET</div>
+                  </div>
+                  <div style={{ textAlign:"right" }}>
+                    <div style={{ fontSize:10, color:"#64748B" }}>Sheet No.</div>
+                    <div style={{ fontSize:22, fontWeight:800, color:"#EF4444" }}>{trip.sheetNo || "—"}</div>
+                  </div>
+                </div>
+
+                {/* Info rows */}
+                {[
+                  ["TYPE OF VEHICLE", "vehicleType", trip.vehicleType || (vehicle?.type) || "—"],
+                  ["VEHICLE NO.", "vehicleNumber", vehicle?.number || trip.vehicleId || "—"],
+                  ["DRIVER'S NAME", null, driver.name],
+                  ["PASSENGER NAME", "passengerName", trip.passengerName || "—"],
+                  ["EXPECTED PLACE TO TRAVEL", null, `${trip.pickup || "—"} → ${trip.destination || "—"}`],
+                ].map(([label, field, val]) => (
+                  <div key={label} style={TS.row}>
+                    <div style={TS.rowLabel}>{label}</div>
+                    <div style={TS.rowVal}>
+                      {editing && field
+                        ? <input style={TS.rowInp} value={form[field] || ""} onChange={e => fSet(field, e.target.value)}/>
+                        : val}
+                    </div>
+                  </div>
+                ))}
+
+                {/* KMS/Time table */}
+                <div style={TS.tableHead}>
+                  {["DATE","STARTING TIME","STARTING KMS","CLOSING TIME","CLOSING KMS","TOTAL KMS","TOTAL TIME","REMARKS"].map(h => (
+                    <div key={h} style={TS.th}>{h}</div>
+                  ))}
+                </div>
+                <div style={TS.tableRow}>
+                  {/* Date */}
+                  <div style={TS.td}>
+                    {editing
+                      ? <input type="date" style={{ ...TS.tdInp, fontSize:10 }} value={form.date} onChange={e=>fSet("date",e.target.value)}/>
+                      : fmtDate(trip.date)}
+                  </div>
+                  {/* Start Time */}
+                  <div style={TS.td}>
+                    {editing
+                      ? <input type="time" style={TS.tdInp} value={form.startTime} onChange={e=>fSet("startTime",e.target.value)}/>
+                      : trip.startTime || <span style={{ color:"#CBD5E1" }}>—</span>}
+                  </div>
+                  {/* Start KMS */}
+                  <div style={TS.td}>
+                    {editing
+                      ? <input type="number" style={TS.tdInp} value={form.startKms} onChange={e=>fSet("startKms",e.target.value)} placeholder="KMS"/>
+                      : trip.startKms || <span style={{ color:"#CBD5E1" }}>—</span>}
+                  </div>
+                  {/* Close Time */}
+                  <div style={TS.td}>
+                    {editing
+                      ? <input type="time" style={TS.tdInp} value={form.closeTime} onChange={e=>fSet("closeTime",e.target.value)}/>
+                      : trip.closeTime || <span style={{ color:"#CBD5E1" }}>—</span>}
+                  </div>
+                  {/* Close KMS */}
+                  <div style={TS.td}>
+                    {editing
+                      ? <input type="number" style={TS.tdInp} value={form.closeKms} onChange={e=>fSet("closeKms",e.target.value)} placeholder="KMS"/>
+                      : trip.closeKms || <span style={{ color:"#CBD5E1" }}>—</span>}
+                  </div>
+                  {/* Total KMS - auto */}
+                  <div style={{ ...TS.td, background:"#F0FDF4", color:"#15803D" }}>
+                    {editing
+                      ? (computeKms() !== null ? <strong>{computeKms()}</strong> : <span style={{ color:"#CBD5E1" }}>Auto</span>)
+                      : (trip.totalKms ? <strong>{trip.totalKms}</strong> : <span style={{ color:"#CBD5E1" }}>—</span>)}
+                  </div>
+                  {/* Total Time */}
+                  <div style={TS.td}>
+                    {editing
+                      ? <input style={TS.tdInp} value={form.totalTime} onChange={e=>fSet("totalTime",e.target.value)} placeholder="e.g. 7.15 Hours"/>
+                      : trip.totalTime || <span style={{ color:"#CBD5E1" }}>—</span>}
+                  </div>
+                  {/* Remarks */}
+                  <div style={{ ...TS.td, textAlign:"left" }}>
+                    {editing
+                      ? <input style={TS.tdInp} value={form.remarks} onChange={e=>fSet("remarks",e.target.value)} placeholder="Remarks…"/>
+                      : trip.remarks || <span style={{ color:"#CBD5E1" }}>—</span>}
+                  </div>
+                </div>
+
+                {/* Signature row */}
+                <div style={TS.sigRow}>
+                  <div style={TS.sigCell}>
+                    <div style={{ fontSize:10, fontWeight:700, color:"#1A2C42", marginBottom:8 }}>DRIVER'S SIGNATURE</div>
+                    <div style={{ fontSize:14, fontStyle:"italic", color:"#374151", borderBottom:"1px solid #CBD5E1", paddingBottom:6 }}>{driver.name}</div>
+                  </div>
+                  <div style={{ ...TS.sigCell, borderLeft:"2px solid #1A2C42" }}>
+                    <div style={{ fontSize:10, fontWeight:700, color:"#1A2C42", marginBottom:8 }}>PASSENGER SIGNATURE</div>
+                    <div style={{ height:24, borderBottom:"1px solid #CBD5E1" }}/>
+                  </div>
+                </div>
+              </div>
+
+              {/* Scanned Document Upload Section */}
+              <div style={{ margin:"0 20px 20px", padding:"18px 20px", background:"#F8FAFC", border:"1px solid #E2E8F0", borderRadius:10 }}>
+                <div style={{ fontSize:14, fontWeight:700, color:"#0F1C2E", marginBottom:12, display:"flex", alignItems:"center", gap:8 }}>
+                  <Icon n="doc" size={16} color="#2E7CF6"/>
+                  Scanned Trip Sheet Document
+                </div>
+
+                {existingScan ? (
+                  <div style={{ display:"flex", alignItems:"center", gap:12, background:"#EFF6FF", border:"1px solid #BFDBFE", borderRadius:8, padding:"12px 16px", marginBottom:12 }}>
+                    <Icon n="check" size={18} color="#10B981"/>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:13, fontWeight:700, color:"#0F1C2E" }}>{existingScan.fileName}</div>
+                      <div style={{ fontSize:11, color:"#64748B" }}>Uploaded {fmtDate(existingScan.uploadDate)} by {existingScan.uploadedBy} · Visible to Admin</div>
+                    </div>
+                    <button style={{ ...C.btn("ghost"), padding:"5px 12px", fontSize:12 }} onClick={() => setViewScan(existingScan)}>
+                      <Icon n="eye" size={13} color="#2E7CF6"/> View
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ background:"#FFF7ED", border:"1px solid #FED7AA", borderRadius:8, padding:"10px 14px", marginBottom:12, fontSize:12, color:"#92400E" }}>
+                    No scan uploaded yet. Please upload a photo or PDF of the signed physical trip sheet.
+                  </div>
+                )}
+
+                <div style={{ border:"2px dashed #CBD5E1", borderRadius:8, padding:"16px", textAlign:"center", background:"#fff" }}>
+                  <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" id="tripScanInput" style={{ display:"none" }}
+                    onChange={handleScanUpload}
+                  />
+                  <label htmlFor="tripScanInput" style={{ ...C.btn("ghost"), cursor:"pointer", display:"inline-flex" }}>
+                    <Icon n="download" size={14} color="#2E7CF6"/>
+                    {scanUploading ? "Reading file…" : scanFile.fileData ? "Replace File" : existingScan ? "Upload New Scan" : "Upload Scanned Document"}
+                  </label>
+                  <div style={{ fontSize:11, color:"#94A3B8", marginTop:6 }}>Supports PDF, JPG, PNG, WEBP · This will be visible to Admin</div>
+                  {scanFile.fileData && !scanUploading && (
+                    <div style={{ marginTop:10, display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
+                      <Icon n="check" size={14} color="#10B981"/>
+                      <span style={{ fontSize:12, color:"#10B981", fontWeight:600 }}>{scanFile.fileName} — ready to upload</span>
+                      <button style={C.btn("primary")} onClick={saveScan}>
+                        <Icon n="check" size={13} color="#fff"/> Save Scan
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        !showNewForm && (
+          <div style={{ ...C.tableWrap, padding:40, textAlign:"center" }}>
+            <Icon n="trip" size={36} color="#CBD5E1"/>
+            <div style={{ marginTop:12, color:"#94A3B8", fontSize:14 }}>No trip sheets yet. Click <strong>New Trip Sheet</strong> above to create one.</div>
+          </div>
+        )
+      )}
+
+      {viewScan && <DocViewerModal doc={viewScan} onClose={() => setViewScan(null)}/>}
+    </div>
+  );
+}
+
+// ─── Driver Portal ─────────────────────────────────────────────────────────────
+function DriverPortal({ user, drivers, vehicles, trips, setTrips, docs, setDocs }) {
+  const driver = drivers.find(d => d.id === user.driverId);
+  const vehicle = vehicles.find(v => v.id === driver?.vehicleId);
+  const myTrips = trips.filter(t => t.driverId === driver?.id).sort((a,b) => b.date.localeCompare(a.date));
+  const [page, setPage] = useState("home");
+  const [issueText, setIssueText] = useState("");
+  const [issueModal, setIssueModal] = useState(false);
+  const [scanModal, setScanModal] = useState(null); // tripId being uploaded
+  const [scanFile, setScanFile] = useState({ fileData:"", fileName:"" });
+  const [scanUploading, setScanUploading] = useState(false);
+
+  const updateTripStatus = (id, status) => setTrips(p => p.map(t => t.id===id ? {...t,status} : t));
+
+  if (!driver) return <div style={C.emptyState}>Driver profile not found.</div>;
+
+  const navItems = [
+    { key:"home", icon:"dashboard", label:"My Dashboard" },
+    { key:"trips", icon:"trip", label:"My Trips" },
+    { key:"tripsheet", icon:"doc", label:"Trip Sheet" },
+    { key:"documents", icon:"doc", label:"Documents" },
+    { key:"vehicle", icon:"vehicle", label:"My Vehicle" },
+    { key:"profile", icon:"driver", label:"My Profile" },
+  ];
+
+  return (
+    <div style={C.app}>
+      <div style={C.sidebar}>
+        <div style={C.sidebarTop}>
+          <p style={C.logo}>Travel Desk</p>
+          <p style={C.logoSub}>Driver Portal</p>
+        </div>
+        <nav style={C.nav}>
+          {navItems.map(item => (
+            <div key={item.key} style={C.navItem(page===item.key)} onClick={() => setPage(item.key)}>
+              <Icon n={item.icon} size={17} color={page===item.key?"#fff":"#94A3B8"}/>
+              {item.label}
+            </div>
+          ))}
+        </nav>
+      </div>
+      <div style={C.main}>
+        <div style={C.topbar}>
+          <div>
+            <h1 style={C.pageTitle}>Welcome, {driver.name}</h1>
+            <span style={{ fontSize:12, color:"#64748B" }}>{driver.empId} • <Badge status={driver.status}/></span>
+          </div>
+          <button style={{ ...C.iconBtn, color:"#64748B", fontSize:13, gap:4 }} onClick={() => window.location.reload()}>
+            <Icon n="logout" size={16} color="#64748B"/> Logout
+          </button>
+        </div>
+        <div style={C.content}>
+
+          {page === "home" && (
+            <div>
+              <div style={C.statsGrid}>
+                <Stat label="Total Trips" value={myTrips.length} accent="#2E7CF6"/>
+                <Stat label="Active" value={myTrips.filter(t=>t.status==="Trip Started").length} accent="#10B981"/>
+                <Stat label="Upcoming" value={myTrips.filter(t=>["Approved","Vehicle Assigned","Driver Assigned"].includes(t.status)).length} accent="#F59E0B"/>
+                <Stat label="Completed" value={myTrips.filter(t=>t.status==="Trip Completed").length} accent="#8B5CF6"/>
+              </div>
+              {vehicle && (
+                <div style={{ ...C.tableWrap, padding:"16px 20px", marginBottom:16 }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:"#0F1C2E", marginBottom:10 }}>Assigned Vehicle</div>
+                  <div style={{ display:"flex", gap:24, flexWrap:"wrap" }}>
+                    <div><span style={{ fontSize:11, color:"#64748B" }}>Number</span><div style={{ fontWeight:700, color:"#2E7CF6" }}>{vehicle.number}</div></div>
+                    <div><span style={{ fontSize:11, color:"#64748B" }}>Type</span><div style={{ fontWeight:600 }}>{vehicle.type}</div></div>
+                    <div><span style={{ fontSize:11, color:"#64748B" }}>Make / Model</span><div style={{ fontWeight:600 }}>{vehicle.make} {vehicle.model}</div></div>
+                    <div><span style={{ fontSize:11, color:"#64748B" }}>Capacity</span><div style={{ fontWeight:600 }}>{vehicle.capacity} seats</div></div>
+                    <div><span style={{ fontSize:11, color:"#64748B" }}>Status</span><div><Badge status={vehicle.status}/></div></div>
+                  </div>
+                </div>
+              )}
+              {/* Active trip */}
+              {myTrips.filter(t=>t.status==="Trip Started").map(t => (
+                <div key={t.id} style={{ background:"#EFF6FF", border:"2px solid #BFDBFE", borderRadius:10, padding:"16px 20px", marginBottom:12 }}>
+                  <div style={{ fontWeight:700, color:"#1D4ED8", marginBottom:8 }}>🚗 Active Trip — Sheet #{t.sheetNo || t.id}</div>
+                  <div style={{ fontSize:13, color:"#374151" }}>{t.pickup} → {t.destination}</div>
+                  <div style={{ fontSize:12, color:"#64748B", marginTop:4 }}>{fmtDate(t.date)} • {t.startTime} start • Passenger: {t.passengerName || "—"}</div>
+                  <button style={{ ...C.btn("success"), marginTop:10 }} onClick={() => updateTripStatus(t.id,"Trip Completed")}><Icon n="check" size={14} color="#fff"/> End Trip</button>
+                </div>
+              ))}
+              <button style={{ ...C.btn("warn"), marginTop:8 }} onClick={() => setIssueModal(true)}><Icon n="warn" size={14} color="#fff"/> Report Vehicle Issue</button>
+            </div>
+          )}
+
+          {page === "trips" && (
+            <div style={C.tableWrap}>
+              <div style={C.tableHeader}><span style={C.tableTitle}>My Trip Sheets</span></div>
+              <table style={C.table}>
+                <thead><tr>{["Sheet No.","Date","Passenger","Route","Start KMS","Close KMS","Total KMS","Status","Action"].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead>
+                <tbody>
+                  {myTrips.length===0 && <tr><td colSpan={9} style={{ ...C.td, textAlign:"center", color:"#94A3B8" }}>No trip sheets assigned yet</td></tr>}
+                  {myTrips.map(t => {
+                    const hasScan = docs.some(d => d.tripId === t.id && d.type === "Trip Sheet Scan");
+                    return (
+                      <tr key={t.id}>
+                        <td style={C.td}><span style={{ fontFamily:"monospace", fontSize:12, color:"#2E7CF6", fontWeight:700 }}>{t.sheetNo || t.id}</span></td>
+                        <td style={C.td}>{fmtDate(t.date)}<br/><span style={{ fontSize:11, color:"#64748B" }}>{t.startTime} – {t.closeTime}</span></td>
+                        <td style={C.td}>{t.passengerName || "—"}</td>
+                        <td style={C.td}><span style={{ fontSize:12 }}>{t.pickup}<br/>→ {t.destination}</span></td>
+                        <td style={C.td}>{t.startKms || "—"}</td>
+                        <td style={C.td}>{t.closeKms || "—"}</td>
+                        <td style={C.td}><strong style={{ color:"#15803D" }}>{t.totalKms || "—"}</strong></td>
+                        <td style={C.td}><Badge status={t.status}/></td>
+                        <td style={C.td}>
+                          <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+                            {t.status==="Approved" && <button style={{ ...C.btn("primary"), padding:"4px 10px", fontSize:11 }} onClick={() => updateTripStatus(t.id,"Trip Started")}>Start Trip</button>}
+                            {t.status==="Trip Started" && <button style={{ ...C.btn("success"), padding:"4px 10px", fontSize:11 }} onClick={() => updateTripStatus(t.id,"Trip Completed")}>End Trip</button>}
+                            <button style={{ ...C.btn(hasScan?"ghost":"warn"), padding:"4px 10px", fontSize:11 }} onClick={() => { setScanFile({fileData:"",fileName:""}); setScanModal(t.id); }}>
+                              <Icon n={hasScan?"doc":"download"} size={12} color={hasScan?"#2E7CF6":"#fff"}/>
+                              {hasScan ? "Replace Scan" : "Upload Scan"}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {page === "tripsheet" && <DriverTripSheetForm driver={driver} vehicle={vehicle} trips={myTrips} setTrips={setTrips} docs={docs} setDocs={setDocs}/>}
+
+          {page === "documents" && <DriverDocumentsView docs={docs} vehicles={vehicles} assignedVehicleId={driver?.vehicleId}/>}
+
+          {page === "vehicle" && vehicle && (
+            <div>
+              <div style={{ ...C.tableWrap, padding:"20px 24px", marginBottom:16 }}>
+                <div style={{ fontSize:15, fontWeight:700, marginBottom:16 }}>Vehicle Details — {vehicle.number}</div>
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
+                  {[["Type",vehicle.type],["Make",vehicle.make],["Model",vehicle.model],["Capacity",`${vehicle.capacity} seats`],["Fuel",vehicle.fuel],["Owner",vehicle.owner],["Status",vehicle.status]].map(([l,v]) => (
+                    <div key={l}>
+                      <div style={{ fontSize:11, color:"#64748B" }}>{l}</div>
+                      <div style={{ fontWeight:600, marginTop:2 }}>{l==="Status"?<Badge status={v}/>:v}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div style={{ ...C.tableWrap, padding:"20px 24px" }}>
+                <div style={{ fontSize:15, fontWeight:700, marginBottom:16 }}>Document Expiry Status</div>
+                {[["Insurance",vehicle.insuranceExpiry],["PUC",vehicle.pucExpiry],["Fitness",vehicle.fitnessExpiry],["Road Tax",vehicle.roadTaxExpiry],["Permit",vehicle.permitExpiry]].map(([l,d]) => (
+                  <div key={l} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:"1px solid #F1F5F9" }}>
+                    <span style={{ fontSize:13, color:"#374151" }}>{l}</span>
+                    <span style={C.chip(statusColor(expiryStatus(d)))}>{fmtDate(d)} ({expiryStatus(d)})</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {page === "profile" && (
+            <div style={{ ...C.tableWrap, padding:"24px" }}>
+              <div style={{ fontSize:15, fontWeight:700, marginBottom:16 }}>My Profile</div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
+                {[["Employee ID",driver.empId],["Full Name",driver.name],["Mobile",driver.mobile],["License No.",driver.licenseNo],["License Expiry",fmtDate(driver.licenseExpiry)],["Status",driver.status],["Address",driver.address]].map(([l,v]) => (
+                  <div key={l}>
+                    <div style={{ fontSize:11, color:"#64748B" }}>{l}</div>
+                    <div style={{ fontWeight:600, marginTop:2, fontSize:13 }}>{l==="Status"?<Badge status={v}/>:v||"—"}</div>
+                  </div>
+                ))}
+              </div>
+              {driver.licenseExpiry && daysUntil(driver.licenseExpiry) <= 60 && (
+                <Alert type="warn" style={{ marginTop:16 }}>
+                  Your driving license expires on {fmtDate(driver.licenseExpiry)} ({daysUntil(driver.licenseExpiry)} days). Please renew it.
+                </Alert>
+              )}
+            </div>
+          )}
+
+        </div>
+      </div>
+      {scanModal && (
+        <Modal title="Upload Trip Sheet Scan" onClose={() => setScanModal(null)}>
+          <div style={C.form}>
+            <div style={{ marginBottom:14, padding:"10px 14px", background:"#EFF6FF", borderRadius:8, fontSize:13, color:"#1D4ED8" }}>
+              Trip Sheet: <strong>#{myTrips.find(t=>t.id===scanModal)?.sheetNo || scanModal}</strong>
+            </div>
+            <div style={{ border:"2px dashed #D1D5DB", borderRadius:8, padding:"20px 16px", textAlign:"center", background:"#F8FAFC" }}>
+              <Icon n="doc" size={20} color="#94A3B8"/>
+              <div style={{ fontSize:13, fontWeight:600, color:"#64748B", marginTop:6 }}>Upload Scanned Trip Sheet</div>
+              <div style={{ fontSize:11, color:"#94A3B8", marginTop:2 }}>Supports PDF, JPG, PNG</div>
+              <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" id="scanFileInput" style={{ display:"none" }}
+                onChange={e => {
+                  const file = e.target.files[0];
+                  if (!file) return;
+                  setScanUploading(true);
+                  const reader = new FileReader();
+                  reader.onload = ev => { setScanFile({ fileData: ev.target.result, fileName: file.name }); setScanUploading(false); };
+                  reader.readAsDataURL(file);
+                }}
+              />
+              <label htmlFor="scanFileInput" style={{ ...C.btn("ghost"), cursor:"pointer", display:"inline-flex", marginTop:10 }}>
+                {scanUploading ? "Reading…" : scanFile.fileData ? "Replace File" : "Choose File"}
+              </label>
+              {scanFile.fileData && !scanUploading && (
+                <div style={{ marginTop:10, display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
+                  <Icon n="check" size={15} color="#10B981"/>
+                  <span style={{ fontSize:12, color:"#10B981", fontWeight:600 }}>{scanFile.fileName}</span>
+                </div>
+              )}
+            </div>
+            <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:20 }}>
+              <button style={C.btn("ghost")} onClick={() => setScanModal(null)}>Cancel</button>
+              <button style={C.btn("primary")} disabled={!scanFile.fileData} onClick={() => {
+                if (!scanFile.fileData) return;
+                const trip = myTrips.find(t => t.id === scanModal);
+                const existingIdx = docs.findIndex(d => d.tripId === scanModal && d.type === "Trip Sheet Scan");
+                const newDoc = {
+                  id: existingIdx >= 0 ? docs[existingIdx].id : "DOC" + uid(),
+                  vehicleId: vehicle?.id || "",
+                  tripId: scanModal,
+                  name: `Trip Sheet #${trip?.sheetNo || scanModal}`,
+                  type: "Trip Sheet Scan",
+                  uploadDate: today(),
+                  expiryDate: "",
+                  status: "Valid",
+                  fileName: scanFile.fileName,
+                  fileData: scanFile.fileData,
+                  uploadedBy: driver.name,
+                };
+                if (existingIdx >= 0) {
+                  setDocs(p => p.map((d,i) => i === existingIdx ? newDoc : d));
+                } else {
+                  setDocs(p => [...p, newDoc]);
+                }
+                setScanModal(null);
+                setScanFile({ fileData:"", fileName:"" });
+              }}>Save Scan</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {issueModal && (
+        <Modal title="Report Vehicle Issue" onClose={() => setIssueModal(false)}>
+          <div style={C.form}>
+            <FormField label="Describe the issue">
+              <textarea style={{ ...C.input, minHeight:100, resize:"vertical", width:"100%", boxSizing:"border-box" }} value={issueText} onChange={e=>setIssueText(e.target.value)} placeholder="Describe the vehicle problem or maintenance requirement…"/>
+            </FormField>
+            <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:16 }}>
+              <button style={C.btn("ghost")} onClick={() => setIssueModal(false)}>Cancel</button>
+              <button style={C.btn("warn")} onClick={() => { alert(`Issue reported:\n"${issueText}"\n\nAdmin will be notified.`); setIssueText(""); setIssueModal(false); }}><Icon n="warn" size={14} color="#fff"/> Submit Report</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ─── Admin Trip Scans View ─────────────────────────────────────────────────────
+function AdminTripScans({ docs, trips, vehicles, drivers }) {
+  const [viewDoc, setViewDoc] = useState(null);
+  const [search, setSearch] = useState("");
+  const [filterDriver, setFilterDriver] = useState("");
+
+  const scans = docs.filter(d => d.type === "Trip Sheet Scan");
+
+  const getTrip = (tripId) => trips.find(t => t.id === tripId);
+  const getVehicle = (vid) => vehicles.find(v => v.id === vid);
+  const getDriver = (driverId) => drivers.find(d => d.id === driverId);
+
+  const filtered = scans.filter(d => {
+    const t = getTrip(d.tripId);
+    const q = search.toLowerCase();
+    const matchesSearch = !q || d.name.toLowerCase().includes(q) || (t && (t.sheetNo||"").toLowerCase().includes(q)) || (t && (t.passengerName||"").toLowerCase().includes(q));
+    const matchesDriver = !filterDriver || (t && t.driverId === filterDriver);
+    return matchesSearch && matchesDriver;
+  });
+
+  return (
+    <div>
+      <div style={{ background:"#EFF6FF", border:"1px solid #BFDBFE", borderRadius:10, padding:"14px 18px", marginBottom:16, display:"flex", alignItems:"center", gap:10 }}>
+        <Icon n="doc" size={18} color="#2E7CF6"/>
+        <div style={{ fontSize:13, color:"#1D4ED8" }}>
+          Drivers upload scanned physical trip sheets from their <strong>Trip Sheet</strong> portal page. All uploads appear here for admin review.
+          <span style={{ marginLeft:8, background:"#BFDBFE", borderRadius:4, padding:"2px 8px", fontSize:12, fontWeight:700 }}>{scans.length} scan{scans.length!==1?"s":""} total</span>
+        </div>
+      </div>
+
+      <div style={C.tableWrap}>
+        <div style={C.tableHeader}>
+          <span style={C.tableTitle}>Trip Sheet Scans ({filtered.length})</span>
+        </div>
+        <div style={C.filterRow}>
+          <SearchBox value={search} onChange={setSearch} placeholder="Search sheet no, passenger…"/>
+          <select style={{ ...C.select, minWidth:160, width:"auto" }} value={filterDriver} onChange={e=>setFilterDriver(e.target.value)}>
+            <option value="">All Drivers</option>
+            {drivers.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
+          </select>
+        </div>
+        <div style={{ overflowX:"auto" }}>
+          <table style={C.table}>
+            <thead><tr>
+              {["Sheet No.","Trip Date","Passenger","Route","Vehicle","Driver","Upload Date","Uploaded By","Scan"].map(h=><th key={h} style={C.th}>{h}</th>)}
+            </tr></thead>
+            <tbody>
+              {filtered.length === 0 && (
+                <tr><td colSpan={9} style={{ ...C.td, textAlign:"center", padding:"40px", color:"#94A3B8" }}>
+                  <div><Icon n="doc" size={32} color="#CBD5E1"/></div>
+                  <div style={{ marginTop:8 }}>No trip sheet scans uploaded yet.</div>
+                  <div style={{ fontSize:12, marginTop:4 }}>Drivers can upload scans from their Trip Sheet page.</div>
+                </td></tr>
+              )}
+              {filtered.map(d => {
+                const t = getTrip(d.tripId);
+                const drv = t ? getDriver(t.driverId) : null;
+                const v = getVehicle(d.vehicleId);
+                return (
+                  <tr key={d.id}>
+                    <td style={C.td}><span style={{ fontFamily:"monospace", fontSize:13, color:"#EF4444", fontWeight:800 }}>{t?.sheetNo || "—"}</span></td>
+                    <td style={C.td}>{t ? fmtDate(t.date) : "—"}</td>
+                    <td style={C.td}>{t?.passengerName || "—"}</td>
+                    <td style={C.td}><span style={{ fontSize:12 }}>{t ? `${t.pickup} → ${t.destination}` : "—"}</span></td>
+                    <td style={C.td}>{v ? <span style={{ fontWeight:600, color:"#2E7CF6" }}>{v.number}</span> : "—"}</td>
+                    <td style={C.td}>{drv ? drv.name : d.uploadedBy || "—"}</td>
+                    <td style={C.td}>{fmtDate(d.uploadDate)}</td>
+                    <td style={C.td}>{d.uploadedBy || "—"}</td>
+                    <td style={C.td}>
+                      {d.fileData
+                        ? <button style={{ ...C.btn("primary"), padding:"5px 12px", fontSize:12 }} onClick={() => setViewDoc(d)}>
+                            <Icon n="eye" size={13} color="#fff"/> View Scan
+                          </button>
+                        : <span style={{ fontSize:11, color:"#F59E0B" }}>File missing</span>}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {viewDoc && <DocViewerModal doc={viewDoc} onClose={() => setViewDoc(null)}/>}
+    </div>
+  );
+}
+
+// ─── Admin Portal ──────────────────────────────────────────────────────────────
+const NAV = [
+  { key:"dashboard", icon:"dashboard", label:"Dashboard", section:"Overview" },
+  { key:"vehicles", icon:"vehicle", label:"Vehicles", section:"Fleet" },
+  { key:"documents", icon:"doc", label:"Documents", section:"Fleet" },
+  { key:"tripscans", icon:"doc", label:"Trip Sheet Scans", section:"Fleet" },
+  { key:"drivers", icon:"driver", label:"Drivers", section:"People" },
+  { key:"reports", icon:"report", label:"Reports", section:"Analytics" },
+];
+
+function AdminPortal({ user, vehicles, setVehicles, drivers, setDrivers, trips, setTrips, docs, setDocs }) {
+  const [page, setPage] = useState("dashboard");
+  const [notifOpen, setNotifOpen] = useState(false);
+
+  const alerts = useMemo(() => {
+    const out = [];
+    vehicles.forEach(v => {
+      [["insuranceExpiry","Insurance"],["pucExpiry","PUC"],["fitnessExpiry","Fitness"],["roadTaxExpiry","Road Tax"],["permitExpiry","Permit"]].forEach(([k,label]) => {
+        const days = daysUntil(v[k]);
+        if (days < 0) out.push({ type:"danger", msg:`${v.number}: ${label} expired` });
+        else if (days <= 30) out.push({ type:"warn", msg:`${v.number}: ${label} expires in ${days}d` });
+      });
+    });
+    drivers.forEach(d => {
+      const days = daysUntil(d.licenseExpiry);
+      if (days < 0) out.push({ type:"danger", msg:`${d.name}: License expired` });
+      else if (days <= 60) out.push({ type:"warn", msg:`${d.name}: License expires in ${days}d` });
+    });
+    return out;
+  }, [vehicles, drivers]);
+
+  const sections = [...new Set(NAV.map(n=>n.section))];
+  const titles = { dashboard:"Dashboard", vehicles:"Vehicle Fleet", documents:"Document Management", tripscans:"Trip Sheet Scans", drivers:"Driver Management", reports:"Reports" };
+
+  return (
+    <div style={C.app}>
+      {/* Sidebar */}
+      <div style={C.sidebar}>
+        <div style={C.sidebarTop}>
+          <p style={C.logo}>Travel Desk</p>
+          <p style={C.logoSub}>Admin Portal · GITAM</p>
+        </div>
+        <nav style={C.nav}>
+          {sections.map(sec => (
+            <div key={sec}>
+              <div style={C.navSection}>{sec}</div>
+              {NAV.filter(n=>n.section===sec).map(item => (
+                <div key={item.key} style={C.navItem(page===item.key)} onClick={() => setPage(item.key)}>
+                  <Icon n={item.icon} size={17} color={page===item.key?"#fff":"#94A3B8"}/>
+                  {item.label}
+                </div>
+              ))}
+            </div>
+          ))}
+        </nav>
+        <div style={{ padding:"12px 16px", borderTop:"1px solid #1F3048" }}>
+          <div style={{ fontSize:12, color:"#64748B" }}>Signed in as</div>
+          <div style={{ fontSize:13, color:"#fff", fontWeight:600, marginTop:2 }}>{user.name}</div>
+        </div>
+      </div>
+
+      {/* Main */}
+      <div style={C.main}>
+        <div style={C.topbar}>
+          <h1 style={C.pageTitle}>{titles[page]}</h1>
+          <div style={C.row}>
+            {/* Bell */}
+            <div style={{ position:"relative" }}>
+              <button style={{ ...C.iconBtn, position:"relative" }} onClick={() => setNotifOpen(o=>!o)}>
+                <Icon n="bell" size={20} color="#64748B"/>
+                {alerts.length > 0 && <span style={{ position:"absolute", top:0, right:0, background:"#EF4444", color:"#fff", fontSize:9, fontWeight:700, width:14, height:14, borderRadius:99, display:"flex", alignItems:"center", justifyContent:"center" }}>{alerts.length}</span>}
+              </button>
+              {notifOpen && (
+                <div style={{ position:"absolute", right:0, top:36, background:"#fff", border:"1px solid #E2E8F0", borderRadius:10, width:320, boxShadow:"0 8px 24px rgba(0,0,0,.12)", zIndex:200, maxHeight:400, overflowY:"auto" }}>
+                  <div style={{ padding:"12px 16px", borderBottom:"1px solid #E2E8F0", fontWeight:700, fontSize:13 }}>Notifications ({alerts.length})</div>
+                  {alerts.length === 0 && <div style={{ padding:16, color:"#94A3B8", fontSize:13 }}>All clear!</div>}
+                  {alerts.map((a,i) => <div key={i} style={{ padding:"10px 16px", borderBottom:"1px solid #F1F5F9", display:"flex", gap:8, alignItems:"flex-start" }}>
+                    <Icon n={a.type==="danger"?"warn":"warn"} size={14} color={a.type==="danger"?"#EF4444":"#F59E0B"}/>
+                    <span style={{ fontSize:12, color:"#374151" }}>{a.msg}</span>
+                  </div>)}
+                </div>
+              )}
+            </div>
+            <button style={{ ...C.iconBtn, fontSize:13, color:"#64748B", gap:4 }} onClick={() => window.location.reload()}>
+              <Icon n="logout" size={16} color="#64748B"/> Logout
+            </button>
+          </div>
+        </div>
+
+        <div style={C.content}>
+          {page === "dashboard" && <Dashboard vehicles={vehicles} drivers={drivers} trips={trips} docs={docs}/>}
+          {page === "vehicles" && <Vehicles vehicles={vehicles} setVehicles={setVehicles} drivers={drivers}/>}
+          {page === "documents" && <Documents docs={docs} setDocs={setDocs} vehicles={vehicles}/>}
+          {page === "tripscans" && <AdminTripScans docs={docs} trips={trips} vehicles={vehicles} drivers={drivers}/>}
+          {page === "drivers" && <Drivers drivers={drivers} setDrivers={setDrivers} vehicles={vehicles}/>}
+          {page === "reports" && <Reports trips={trips} vehicles={vehicles} drivers={drivers}/>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Root ──────────────────────────────────────────────────────────────────────
+function App() {
+  const [user, setUser] = useState(null);
+  const [vehicles, setVehicles] = useRTDB("td_vehicles", SEED_VEHICLES);
+  const [drivers, setDrivers] = useRTDB("td_drivers", SEED_DRIVERS);
+  const [trips, setTrips] = useRTDB("td_trips", SEED_TRIPS);
+  const [docs, setDocs] = useRTDB("td_docs", SEED_DOCS);
+
+  // Auto-logout driver after inactivity
+  useEffect(() => {
+    if (!user || user.role !== "driver") return;
+    let timer;
+    const reset = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        alert("You have been logged out due to inactivity (15 minutes).");
+        setUser(null);
+      }, INACTIVITY_MS);
+    };
+    const events = ["mousemove","keydown","click","touchstart"];
+    events.forEach(e => window.addEventListener(e, reset));
+    reset();
+    return () => { clearTimeout(timer); events.forEach(e => window.removeEventListener(e, reset)); };
+  }, [user]);
+
+  const FBBanner = !FB_READY && (
+    <div style={{ position:"fixed", bottom:0, left:0, right:0, background:"#1e3a5f", color:"#fff", padding:"10px 20px", fontSize:12, zIndex:9999, display:"flex", alignItems:"center", gap:12 }}>
+      <Icon n="warn" size={16} color="#F59E0B"/>
+      <span><strong>Firebase not configured</strong> — running on localStorage only. Open the HTML file and fill in your <code style={{background:"#0f2540",padding:"1px 5px",borderRadius:3}}>FIREBASE_CONFIG</code> to enable real-time sync &amp; multi-device support.</span>
+    </div>
+  );
+
+  if (!user) return <>{FBBanner}<Login onLogin={setUser} drivers={drivers} setDrivers={setDrivers}/></>;
+  if (user.role === "driver") return <>{FBBanner}<DriverPortal user={user} drivers={drivers} vehicles={vehicles} trips={trips} setTrips={setTrips} docs={docs} setDocs={setDocs}/></>;
+  return <>{FBBanner}<AdminPortal user={user} vehicles={vehicles} setVehicles={setVehicles} drivers={drivers} setDrivers={setDrivers} trips={trips} setTrips={setTrips} docs={docs} setDocs={setDocs}/></>;
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+</script>
+</body>
+</html>
