@@ -10,10 +10,12 @@
 <!-- Firebase RTDB -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <style>*{box-sizing:border-box;margin:0;padding:0;}body{overflow:hidden;}</style>
 </head>
 <body>
 <div id="root"></div>
+<div id="recaptcha-container"></div>
 <script>
 // ─── Firebase Configuration ───────────────────────────────────────────────────
 // 🔧 REPLACE these values with your Firebase project config
@@ -39,33 +41,13 @@ if (FB_READY) {
 const { useState, useEffect, useRef, useMemo } = React;
 
 // ─── Seed Data ────────────────────────────────────────────────────────────────
-const SEED_VEHICLES = [
-  { id: "V001", number: "KA01AB1234", type: "SUV", make: "Toyota", model: "Fortuner", capacity: 7, fuel: "Diesel", owner: "GITAM University", driverId: "D001", status: "Available", purchaseDate: "2021-06-15", insuranceExpiry: "2025-06-14", pucExpiry: "2025-03-10", fitnessExpiry: "2026-06-14", roadTaxExpiry: "2026-06-14", permitExpiry: "2026-06-14", notes: "" },
-  { id: "V002", number: "KA01CD5678", type: "Sedan", make: "Honda", model: "City", capacity: 5, fuel: "Petrol", owner: "GITAM University", driverId: "D002", status: "On Trip", purchaseDate: "2022-01-10", insuranceExpiry: "2024-12-31", pucExpiry: "2025-02-28", fitnessExpiry: "2025-01-10", roadTaxExpiry: "2027-01-10", permitExpiry: "2025-06-01", notes: "" },
-  { id: "V003", number: "KA02EF9012", type: "Bus", make: "Tata", model: "Starbus", capacity: 32, fuel: "Diesel", owner: "GITAM University", driverId: "D003", status: "Under Maintenance", purchaseDate: "2020-03-20", insuranceExpiry: "2025-10-19", pucExpiry: "2025-08-01", fitnessExpiry: "2025-03-20", roadTaxExpiry: "2025-03-20", permitExpiry: "2025-09-19", notes: "Engine overhaul" },
-  { id: "V004", number: "KA03GH3456", type: "Van", make: "Force", model: "Traveller", capacity: 12, fuel: "Diesel", owner: "GITAM University", driverId: "", status: "Available", purchaseDate: "2023-07-05", insuranceExpiry: "2026-07-04", pucExpiry: "2025-07-04", fitnessExpiry: "2026-07-04", roadTaxExpiry: "2028-07-04", permitExpiry: "2027-07-04", notes: "" },
-];
+const SEED_VEHICLES = [];
 
-const SEED_DRIVERS = [
-  { id: "D001", empId: "EMP101", name: "Rajesh Kumar", mobile: "9876543210", licenseNo: "KA0120180012345", licenseExpiry: "2026-08-20", vehicleId: "V001", status: "Available", address: "Bangalore", pin: "1234", active: true, loginLog: [] },
-  { id: "D002", empId: "EMP102", name: "Suresh Naidu", mobile: "9876501234", licenseNo: "KA0120190054321", licenseExpiry: "2025-05-15", vehicleId: "V002", status: "On Trip", address: "Doddaballapura", pin: "1234", active: true, loginLog: [] },
-  { id: "D003", empId: "EMP103", name: "Vijay Sharma", mobile: "9845678901", licenseNo: "KA0120170067890", licenseExpiry: "2024-11-30", vehicleId: "V003", status: "Off Duty", address: "Devanahalli", pin: "1234", active: false, loginLog: [] },
-  { id: "D004", empId: "EMP104", name: "Arun Patil", mobile: "9900112233", licenseNo: "KA0120210098765", licenseExpiry: "2027-03-10", vehicleId: "", status: "Available", address: "Yelahanka", pin: "1234", active: true, loginLog: [] },
-];
+const SEED_DRIVERS = [];
 
-const SEED_TRIPS = [
-  { id: "T001", sheetNo: "629", vehicleType: "SUV", vehicleId: "V001", driverId: "D001", passengerName: "Ramesh, TiA", pickup: "GITAM Main Gate", destination: "Kempegowda Airport", purpose: "Official Travel", date: "2025-09-15", startTime: "09:00", startKms: 75763, closeTime: "17:15", closeKms: 75880, totalKms: 117, totalTime: "7.15 Hours", remarks: "", status: "Approved", requestedBy: "Admin", createdAt: "2025-09-10" },
-  { id: "T002", sheetNo: "630", vehicleType: "Sedan", vehicleId: "V002", driverId: "D002", passengerName: "Director, Finance", pickup: "Guest House", destination: "Vidhana Soudha", purpose: "Government Meeting", date: "2025-09-03", startTime: "14:00", startKms: 32100, closeTime: "18:30", closeKms: 32165, totalKms: 65, totalTime: "4.5 Hours", remarks: "", status: "Trip Started", requestedBy: "Admin", createdAt: "2025-09-02" },
-  { id: "T003", sheetNo: "631", vehicleType: "Bus", vehicleId: "V003", driverId: "D003", passengerName: "Students Group", pickup: "GITAM Campus", destination: "Mysuru", purpose: "Field Visit", date: "2025-09-20", startTime: "08:00", startKms: 12500, closeTime: "20:00", closeKms: 12800, totalKms: 300, totalTime: "12 Hours", remarks: "Return same day", status: "Requested", requestedBy: "Admin", createdAt: "2025-09-12" },
-  { id: "T004", sheetNo: "628", vehicleType: "SUV", vehicleId: "V001", driverId: "D001", passengerName: "HOD, Engineering", pickup: "GITAM Campus", destination: "Electronic City", purpose: "Industry Visit", date: "2025-08-28", startTime: "10:00", startKms: 75600, closeTime: "17:00", closeKms: 75763, totalKms: 163, totalTime: "7 Hours", remarks: "", status: "Trip Completed", requestedBy: "Admin", createdAt: "2025-08-25" },
-];
+const SEED_TRIPS = [];
 
-const SEED_DOCS = [
-  { id: "DOC001", vehicleId: "V001", name: "RC Book", type: "Registration Certificate", uploadDate: "2021-06-16", expiryDate: "", status: "Valid", fileName: "V001_RC.pdf" },
-  { id: "DOC002", vehicleId: "V001", name: "Insurance Policy", type: "Insurance", uploadDate: "2024-06-15", expiryDate: "2025-06-14", status: "Valid", fileName: "V001_Insurance.pdf" },
-  { id: "DOC003", vehicleId: "V002", name: "PUC Certificate", type: "PUC", uploadDate: "2024-08-28", expiryDate: "2025-02-28", status: "Expiring Soon", fileName: "V002_PUC.pdf" },
-  { id: "DOC004", vehicleId: "V003", name: "Fitness Certificate", type: "Fitness", uploadDate: "2023-03-20", expiryDate: "2025-03-20", status: "Expiring Soon", fileName: "V003_Fitness.pdf" },
-];
+const SEED_DOCS = [];
 
 const TRIP_STATUSES = ["Requested","Approved","Vehicle Assigned","Driver Assigned","Trip Started","Trip Completed","Cancelled"];
 const VEHICLE_STATUSES = ["Available","On Trip","Under Maintenance","Inactive"];
@@ -87,6 +69,7 @@ const useRTDB = (key, init) => {
     try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : init; } catch { return init; }
   });
   const skipWrite = useRef(false); // prevent echo-write on remote update
+  const seeded = useRef(false); // becomes true after the first snapshot is processed
 
   useEffect(() => {
     if (!FB_READY) return;
@@ -99,10 +82,17 @@ const useRTDB = (key, init) => {
       if (data !== null) {
         skipWrite.current = true;
         sv(data);
-      } else {
-        // First run: seed Firebase with initial data
+      } else if (!seeded.current) {
+        // Truly the first time this node has ever been touched: seed it.
         ref.set(init);
+      } else {
+        // The node is empty because the user deleted everything, not because
+        // it's uninitialized. RTDB stores empty arrays/objects as null, so we
+        // must respect that as "intentionally empty" instead of reseeding.
+        skipWrite.current = true;
+        sv(Array.isArray(init) ? [] : {});
       }
+      seeded.current = true;
     });
 
     return () => ref.off("value", unsub);
@@ -248,9 +238,14 @@ const Sel = ({ options, ...p }) => (
 );
 
 // ─── OTP Helpers ──────────────────────────────────────────────────────────────
-const OTP_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
 const INACTIVITY_MS = 15 * 60 * 1000; // 15 minutes auto-logout
-const generateOTP = () => String(Math.floor(100000 + Math.random() * 900000));
+const COUNTRY_CODE = "+91"; // 🔧 Change if drivers' mobiles are registered in a different country
+
+// Turns a stored 10-digit mobile number into E.164 format required by Firebase Phone Auth
+const toE164 = (mobile) => {
+  const digits = (mobile || "").replace(/\D/g, "").slice(-10);
+  return `${COUNTRY_CODE}${digits}`;
+};
 
 // ─── Login Screen ──────────────────────────────────────────────────────────────
 function Login({ onLogin, drivers, setDrivers }) {
@@ -259,12 +254,14 @@ function Login({ onLogin, drivers, setDrivers }) {
   // Driver OTP flow states
   const [step, setStep] = useState("empid"); // "empid" | "otp"
   const [empId, setEmpId] = useState("");
-  const [otp, setOtp] = useState("");
-  const [otpStore, setOtpStore] = useState(null); // { code, expires, maskedMobile, driverId }
+  const [otpStore, setOtpStore] = useState(null); // { maskedMobile, driverId }
   const [otpInput, setOtpInput] = useState("");
   const [resendCooldown, setResendCooldown] = useState(0);
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
+  const [sending, setSending] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const confirmationRef = useRef(null); // Firebase ConfirmationResult
 
   // Countdown timer for resend
   useEffect(() => {
@@ -273,6 +270,14 @@ function Login({ onLogin, drivers, setDrivers }) {
     return () => clearTimeout(t);
   }, [resendCooldown]);
 
+  // Clean up the reCAPTCHA verifier when the login screen unmounts
+  useEffect(() => () => {
+    if (window.recaptchaVerifier) {
+      try { window.recaptchaVerifier.clear(); } catch (e) {}
+      window.recaptchaVerifier = null;
+    }
+  }, []);
+
   const maskMobile = (m) => m ? m.slice(0,2) + "XXXXXX" + m.slice(-2) : "XXXXXXXX";
 
   const handleVerifyEmpId = () => {
@@ -280,42 +285,72 @@ function Login({ onLogin, drivers, setDrivers }) {
     const d = drivers.find(x => x.empId === empId.trim());
     if (!d) { setErr("Employee ID not registered in the system."); return; }
     if (!d.active) { setErr("Your access has been deactivated. Please contact Admin."); return; }
+    if (!d.mobile || d.mobile.replace(/\D/g,"").length < 10) { setErr("No valid registered mobile number on file. Please contact Admin."); return; }
     sendOTP(d);
   };
 
   const sendOTP = (d) => {
-    const code = generateOTP();
-    const expires = Date.now() + OTP_EXPIRY_MS;
-    setOtpStore({ code, expires, maskedMobile: maskMobile(d.mobile), driverId: d.id });
-    setOtpInput("");
     setErr("");
-    setStep("otp");
-    setResendCooldown(30);
-    // In production this would call an SMS API. For demo, show OTP in info.
-    setInfo(`[Demo] OTP sent to ${maskMobile(d.mobile)}: ${code}`);
+    if (!FB_READY) {
+      setErr("SMS delivery isn't configured yet. Ask your administrator to set up Firebase.");
+      return;
+    }
+    setSending(true);
+    try {
+      // (Re)create the invisible reCAPTCHA verifier required by Firebase Phone Auth
+      if (!window.recaptchaVerifier) {
+        window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', { size: 'invisible' }, firebase.app());
+      }
+      firebase.auth().signInWithPhoneNumber(toE164(d.mobile), window.recaptchaVerifier)
+        .then((confirmationResult) => {
+          confirmationRef.current = confirmationResult;
+          setOtpStore({ maskedMobile: maskMobile(d.mobile), driverId: d.id });
+          setOtpInput("");
+          setStep("otp");
+          setResendCooldown(30);
+          setSending(false);
+        })
+        .catch((error) => {
+          console.error(error);
+          setErr(error.code === "auth/invalid-phone-number"
+            ? "The registered mobile number is invalid. Please contact Admin."
+            : "Couldn't send OTP right now. Please try again in a moment.");
+          setSending(false);
+          if (window.recaptchaVerifier) { try { window.recaptchaVerifier.clear(); } catch (e) {} window.recaptchaVerifier = null; }
+        });
+    } catch (e) {
+      console.error(e);
+      setErr("Couldn't send OTP right now. Please try again in a moment.");
+      setSending(false);
+    }
   };
 
   const handleVerifyOTP = () => {
     setErr("");
-    if (!otpStore) return;
-    if (Date.now() > otpStore.expires) {
-      setErr("OTP has expired. Please request a new one.");
-      setOtpStore(null);
+    if (!confirmationRef.current || !otpStore) {
+      setErr("Your session expired. Please request a new OTP.");
       setStep("empid");
       return;
     }
-    if (otpInput.trim() !== otpStore.code) {
-      setErr("Invalid OTP. Please try again.");
-      return;
-    }
-    // Success — log the login and proceed
-    const d = drivers.find(x => x.id === otpStore.driverId);
-    const loginEntry = { ts: new Date().toLocaleString(), empId: d.empId };
-    setDrivers(prev => prev.map(x => x.id === d.id
-      ? { ...x, loginLog: [...(x.loginLog||[]).slice(-19), loginEntry] }
-      : x
-    ));
-    onLogin({ role:"driver", name:d.name, driverId:d.id, empId:d.empId, loginTime: Date.now() });
+    setVerifying(true);
+    confirmationRef.current.confirm(otpInput.trim())
+      .then(() => {
+        const d = drivers.find(x => x.id === otpStore.driverId);
+        const loginEntry = { ts: new Date().toLocaleString(), empId: d.empId };
+        setDrivers(prev => prev.map(x => x.id === d.id
+          ? { ...x, loginLog: [...(x.loginLog||[]).slice(-19), loginEntry] }
+          : x
+        ));
+        setVerifying(false);
+        onLogin({ role:"driver", name:d.name, driverId:d.id, empId:d.empId, loginTime: Date.now() });
+      })
+      .catch((error) => {
+        console.error(error);
+        setVerifying(false);
+        setErr(error.code === "auth/code-expired"
+          ? "OTP has expired. Please request a new one."
+          : "Invalid OTP. Please try again.");
+      });
   };
 
   const handleResend = () => {
@@ -324,7 +359,7 @@ function Login({ onLogin, drivers, setDrivers }) {
     if (d) sendOTP(d);
   };
 
-  const resetDriverFlow = () => { setStep("empid"); setEmpId(""); setOtpInput(""); setOtpStore(null); setErr(""); setInfo(""); };
+  const resetDriverFlow = () => { setStep("empid"); setEmpId(""); setOtpInput(""); setOtpStore(null); setErr(""); setInfo(""); confirmationRef.current = null; };
 
   const adminSubmit = () => {
     setErr("");
@@ -362,7 +397,6 @@ function Login({ onLogin, drivers, setDrivers }) {
             </FormField>
             {err && <p style={{ color:"#EF4444", fontSize:12, marginTop:8 }}>{err}</p>}
             <button style={{ ...C.btn("primary"), width:"100%", justifyContent:"center", marginTop:18, padding:"11px 0", fontSize:14 }} onClick={adminSubmit}>Sign In</button>
-            <p style={{ fontSize:11, color:"#94A3B8", textAlign:"center", marginTop:14 }}>Admin password: admin123</p>
           </>
         ) : step === "empid" ? (
           <>
@@ -371,16 +405,14 @@ function Login({ onLogin, drivers, setDrivers }) {
               <Inp placeholder="e.g. EMP101" value={empId} onChange={e=>setEmpId(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleVerifyEmpId()}/>
             </FormField>
             {err && <p style={{ color:"#EF4444", fontSize:12, marginTop:8 }}>{err}</p>}
-            <button style={{ ...C.btn("primary"), width:"100%", justifyContent:"center", marginTop:18, padding:"11px 0", fontSize:14 }} onClick={handleVerifyEmpId}>Send OTP</button>
-            <p style={{ fontSize:11, color:"#94A3B8", textAlign:"center", marginTop:14 }}>Demo drivers: EMP101, EMP102, EMP104</p>
+            <button disabled={sending} style={{ ...C.btn("primary"), width:"100%", justifyContent:"center", marginTop:18, padding:"11px 0", fontSize:14, opacity:sending?0.7:1 }} onClick={handleVerifyEmpId}>{sending ? "Sending OTP…" : "Send OTP"}</button>
           </>
         ) : (
           <>
             <div style={{ background:"#EFF6FF", border:"1px solid #BFDBFE", borderRadius:8, padding:"10px 14px", marginBottom:16 }}>
               <div style={{ fontSize:13, color:"#1D4ED8", fontWeight:600 }}>OTP Sent</div>
-              <div style={{ fontSize:12, color:"#374151", marginTop:2 }}>A 6-digit OTP has been sent to {otpStore?.maskedMobile}. It is valid for 5 minutes.</div>
+              <div style={{ fontSize:12, color:"#374151", marginTop:2 }}>A 6-digit OTP has been sent via SMS to {otpStore?.maskedMobile}.</div>
             </div>
-            {info && <div style={{ background:"#FEF9C3", border:"1px solid #FDE047", borderRadius:7, padding:"8px 12px", fontSize:12, color:"#713F12", marginBottom:12 }}>{info}</div>}
             <FormField label="Enter OTP">
               <Inp
                 placeholder="6-digit OTP"
@@ -402,7 +434,7 @@ function Login({ onLogin, drivers, setDrivers }) {
               <button style={{ background:"none", border:"none", fontSize:12, cursor:"pointer", color:"#64748B" }} onClick={resetDriverFlow}>← Change ID</button>
             </div>
             {err && <p style={{ color:"#EF4444", fontSize:12, marginTop:8 }}>{err}</p>}
-            <button style={{ ...C.btn("primary"), width:"100%", justifyContent:"center", marginTop:18, padding:"11px 0", fontSize:14 }} onClick={handleVerifyOTP}>Verify & Sign In</button>
+            <button disabled={verifying} style={{ ...C.btn("primary"), width:"100%", justifyContent:"center", marginTop:18, padding:"11px 0", fontSize:14, opacity:verifying?0.7:1 }} onClick={handleVerifyOTP}>{verifying ? "Verifying…" : "Verify & Sign In"}</button>
           </>
         )}
       </div>
@@ -1266,14 +1298,28 @@ function Trips({ trips, setTrips, vehicles, drivers }) {
 }
 
 // ─── Reports ───────────────────────────────────────────────────────────────────
-function Reports({ trips, vehicles, drivers }) {
+function Reports({ trips, setTrips, vehicles, drivers }) {
   const [type, setType] = useState("trips");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [selected, setSelected] = useState([]);
+
+  useEffect(() => { setSelected([]); }, [type, from, to]);
 
   const inRange = (date) => (!from || date >= from) && (!to || date <= to);
 
   const filtered = trips.filter(t => inRange(t.date));
+
+  const toggleSelect = (id) => setSelected(p => p.includes(id) ? p.filter(x=>x!==id) : [...p, id]);
+  const allSelected = filtered.length > 0 && filtered.every(t => selected.includes(t.id));
+  const toggleSelectAll = () => setSelected(allSelected ? [] : filtered.map(t => t.id));
+  const deleteSelected = () => {
+    if (selected.length === 0) return;
+    if (window.confirm(`Delete ${selected.length} selected report${selected.length > 1 ? "s" : ""}? This cannot be undone.`)) {
+      setTrips(p => p.filter(x => !selected.includes(x.id)));
+      setSelected([]);
+    }
+  };
 
   const tripByStatus = TRIP_STATUSES.map(s => ({ status:s, count:filtered.filter(t=>t.status===s).length })).filter(x=>x.count>0);
 
@@ -1301,7 +1347,14 @@ function Reports({ trips, vehicles, drivers }) {
       <div style={{ ...C.tableWrap, marginBottom:16 }}>
         <div style={C.tableHeader}>
           <span style={C.tableTitle}>Reports</span>
-          <button style={C.btn("ghost")} onClick={() => alert("Export functionality — in production this generates CSV/PDF")}><Icon n="download" size={16} color="#2E7CF6"/> Export</button>
+          <div style={{ marginLeft:"auto", display:"flex", gap:8 }}>
+            {type === "trips" && selected.length > 0 && (
+              <button style={{ ...C.btn("ghost"), color:"#EF4444", borderColor:"#FCA5A5" }} onClick={deleteSelected}>
+                <Icon n="trash" size={16} color="#EF4444"/> Delete Selected ({selected.length})
+              </button>
+            )}
+            <button style={C.btn("ghost")} onClick={() => alert("Export functionality — in production this generates CSV/PDF")}><Icon n="download" size={16} color="#2E7CF6"/> Export</button>
+          </div>
         </div>
         <div style={C.filterRow}>
           <div style={{ display:"flex", gap:6 }}>
@@ -1326,11 +1379,15 @@ function Reports({ trips, vehicles, drivers }) {
             </div>
           </div>
           <table style={C.table}>
-            <thead><tr>{["Sheet No.","Date","Vehicle","Driver","Passenger","Route","Total KMS","Status"].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead>
+            <thead><tr>
+              <th style={{ ...C.th, width:36 }}><input type="checkbox" checked={allSelected} onChange={toggleSelectAll}/></th>
+              {["Sheet No.","Date","Vehicle","Driver","Passenger","Route","Total KMS","Status"].map(h=><th key={h} style={C.th}>{h}</th>)}
+            </tr></thead>
             <tbody>
-              {filtered.length===0 && <tr><td colSpan={8} style={{ ...C.td, textAlign:"center", color:"#94A3B8" }}>No trip sheets in selected range</td></tr>}
+              {filtered.length===0 && <tr><td colSpan={9} style={{ ...C.td, textAlign:"center", color:"#94A3B8" }}>No trip sheets in selected range</td></tr>}
               {filtered.map(t => (
-                <tr key={t.id}>
+                <tr key={t.id} style={selected.includes(t.id) ? { background:"#EFF6FF" } : undefined}>
+                  <td style={C.td}><input type="checkbox" checked={selected.includes(t.id)} onChange={() => toggleSelect(t.id)}/></td>
                   <td style={C.td}><span style={{ fontFamily:"monospace", fontSize:12, color:"#2E7CF6", fontWeight:700 }}>{t.sheetNo || t.id}</span></td>
                   <td style={C.td}>{fmtDate(t.date)}</td>
                   <td style={C.td}>{vehicles.find(v=>v.id===t.vehicleId)?.number || "—"}</td>
@@ -2508,7 +2565,7 @@ function AdminPortal({ user, vehicles, setVehicles, drivers, setDrivers, trips, 
           {page === "documents" && <Documents docs={docs} setDocs={setDocs} vehicles={vehicles}/>}
           {page === "tripscans" && <AdminTripScans docs={docs} trips={trips} vehicles={vehicles} drivers={drivers}/>}
           {page === "drivers" && <Drivers drivers={drivers} setDrivers={setDrivers} vehicles={vehicles}/>}
-          {page === "reports" && <Reports trips={trips} vehicles={vehicles} drivers={drivers}/>}
+          {page === "reports" && <Reports trips={trips} setTrips={setTrips} vehicles={vehicles} drivers={drivers}/>}
         </div>
       </div>
     </div>
