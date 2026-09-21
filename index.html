@@ -73,46 +73,69 @@ const uid = () => Math.random().toString(36).slice(2,8).toUpperCase();
 const statusColor = (s) => ({ "Active":"#10B981","Inactive":"#6B7280","Under Maintenance":"#F59E0B","Off Duty":"#6B7280","On Leave":"#8B5CF6","Approved":"#10B981","Requested":"#F59E0B","Trip Started":"#2E7CF6","Trip Completed":"#6B7280","Cancelled":"#EF4444","Vehicle Assigned":"#8B5CF6","Driver Assigned":"#EC4899","Valid":"#10B981","Expiring Soon":"#F59E0B","Expired":"#EF4444" }[s] || "#6B7280");
 const expiryStatus = (d) => { const days = daysUntil(d); if (days < 0) return "Expired"; if (days <= 30) return "Expiring Soon"; return "Valid"; };
 // ─── Firebase RTDB hook (falls back to localStorage when FB not configured) ───
+// Global, shared error state so any read/write failure anywhere becomes visible
+// on screen (via the banner in App) instead of failing silently.
+window.__FB_ERRORS = [];
+window.__onFbError = null; // set by App to a setState fn
+const reportFbError = (source, err) => {
+  const msg = `[${source}] ${err && err.code ? err.code + ": " : ""}${err && err.message ? err.message : err}`;
+  console.error("Firebase error:", msg, err);
+  window.__FB_ERRORS.push(msg);
+  if (window.__onFbError) window.__onFbError(msg);
+};
+
 const useRTDB = (key, init) => {
   const [v, sv] = useState(() => {
     try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : init; } catch { return init; }
   });
-  const skipWrite = useRef(false); // prevent echo-write on remote update
-  const seeded = useRef(false); // becomes true after the first snapshot is processed
+  // synced: true only after the FIRST snapshot from the server has arrived.
+  // Until then we must never push local state up, or an empty/stale local copy
+  // (e.g. a driver's phone with empty localStorage) overwrites the real data.
+  const synced = useRef(false);
+  // JSON of what the server is known to hold. Used to skip echo-writes, and to
+  // detect real local edits.
+  const lastRemote = useRef(null);
 
   useEffect(() => {
     if (!FB_READY) return;
-    const db = firebase.database();
-    const ref = db.ref("travel_desk/" + key);
+    const ref = firebase.database().ref("travel_desk/" + key);
+    const isArr = Array.isArray(init);
+    const empty = isArr ? [] : {};
 
-    // Listen for remote changes
-    const unsub = ref.on("value", (snap) => {
+    const cb = ref.on("value", (snap) => {
       const data = snap.val();
-      if (data !== null) {
-        skipWrite.current = true;
-        sv(data);
-      } else if (!seeded.current) {
-        // Truly the first time this node has ever been touched: seed it.
-        ref.set(init);
+      let next;
+      if (data === null) {
+        // RTDB stores empty arrays/objects as null. On first load use the seed
+        // (usually empty); afterwards null means "user deleted everything".
+        next = synced.current ? empty : init;
+        lastRemote.current = JSON.stringify(empty);
       } else {
-        // The node is empty because the user deleted everything, not because
-        // it's uninitialized. RTDB stores empty arrays/objects as null, so we
-        // must respect that as "intentionally empty" instead of reseeding.
-        skipWrite.current = true;
-        sv(Array.isArray(init) ? [] : {});
+        // RTDB returns an object instead of an array if the array has gaps.
+        next = (isArr && !Array.isArray(data)) ? Object.values(data) : data;
+        lastRemote.current = JSON.stringify(next);
       }
-      seeded.current = true;
+      synced.current = true;
+      sv(next);
+    }, (err) => {
+      // permission_denied etc. — shown in the red banner at the top of the page
+      reportFbError(`read ${key}`, err);
     });
 
-    return () => ref.off("value", unsub);
+    return () => ref.off("value", cb);
   }, [key]);
 
-  // Write to Firebase (and localStorage as backup) when state changes
+  // Persist local edits (localStorage backup + Firebase)
   useEffect(() => {
-    localStorage.setItem(key, JSON.stringify(v));
+    try { localStorage.setItem(key, JSON.stringify(v)); }
+    catch (e) { console.warn("localStorage write failed for", key, e); } // e.g. quota exceeded — must not block the Firebase write
     if (!FB_READY) return;
-    if (skipWrite.current) { skipWrite.current = false; return; }
-    firebase.database().ref("travel_desk/" + key).set(v);
+    if (!synced.current) return;                         // never write before first server snapshot
+    const json = JSON.stringify(v);
+    if (json === lastRemote.current) return;             // value came from the server; nothing to push
+    lastRemote.current = json;
+    firebase.database().ref("travel_desk/" + key).set(v)
+      .catch(err => reportFbError(`write ${key}`, err));
   }, [key, v]);
 
   return [v, sv];
@@ -2646,6 +2669,12 @@ function App() {
   const [drivers, setDrivers] = useRTDB("td_drivers", SEED_DRIVERS);
   const [trips, setTrips] = useRTDB("td_trips", SEED_TRIPS);
   const [docs, setDocs] = useRTDB("td_docs", SEED_DOCS);
+  const [fbError, setFbError] = useState(null);
+
+  useEffect(() => {
+    window.__onFbError = (msg) => setFbError(msg);
+    return () => { window.__onFbError = null; };
+  }, []);
 
   // Auto-logout driver after inactivity
   useEffect(() => {
@@ -2671,9 +2700,16 @@ function App() {
     </div>
   );
 
-  if (!user) return <>{FBBanner}<Login onLogin={setUser} drivers={drivers} setDrivers={setDrivers}/></>;
-  if (user.role === "driver") return <>{FBBanner}<DriverPortal user={user} drivers={drivers} vehicles={vehicles} trips={trips} setTrips={setTrips} docs={docs} setDocs={setDocs}/></>;
-  return <>{FBBanner}<AdminPortal user={user} vehicles={vehicles} setVehicles={setVehicles} drivers={drivers} setDrivers={setDrivers} trips={trips} setTrips={setTrips} docs={docs} setDocs={setDocs}/></>;
+  const FbErrorBanner = fbError && (
+    <div style={{ position:"fixed", top:0, left:0, right:0, background:"#7f1d1d", color:"#fff", padding:"10px 20px", fontSize:12, zIndex:9999, display:"flex", alignItems:"center", justifyContent:"space-between", gap:12 }}>
+      <span><strong>Backend save failed:</strong> {fbError}</span>
+      <button onClick={() => setFbError(null)} style={{ background:"transparent", border:"1px solid #fff", color:"#fff", borderRadius:4, padding:"2px 8px", cursor:"pointer" }}>Dismiss</button>
+    </div>
+  );
+
+  if (!user) return <>{FBBanner}{FbErrorBanner}<Login onLogin={setUser} drivers={drivers} setDrivers={setDrivers}/></>;
+  if (user.role === "driver") return <>{FBBanner}{FbErrorBanner}<DriverPortal user={user} drivers={drivers} vehicles={vehicles} trips={trips} setTrips={setTrips} docs={docs} setDocs={setDocs}/></>;
+  return <>{FBBanner}{FbErrorBanner}<AdminPortal user={user} vehicles={vehicles} setVehicles={setVehicles} drivers={drivers} setDrivers={setDrivers} trips={trips} setTrips={setTrips} docs={docs} setDocs={setDocs}/></>;
 }
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
